@@ -14,7 +14,7 @@ namespace GameWikiApp
             DefaultTypeMap.MatchNamesWithUnderscores = true;
 
             ApplicationConfiguration.Initialize();
-            Application.Run(new LoginForm());
+            Application.Run(new AuthForm());
         }
     }
 }
