@@ -1,11 +1,13 @@
+using System;
+
 namespace GameWikiApp.Models
 {
-    public class Category
+    public class Comment
     {
-        public int CategoryId { get; set; }
-        public int GameId { get; set; }
-
-        public string CategoryName { get; set; }
-        public string Description { get; set; }
+        public int CommentId { get; set; }
+        public int ArticleId { get; set; }
+        public int UserId { get; set; }
+        public string CommentText { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
     }
 }

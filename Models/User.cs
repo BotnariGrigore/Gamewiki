@@ -5,20 +5,14 @@ namespace GameWikiApp.Models
     public class User
     {
         public int UserId { get; set; }
-        public int RoleId { get; set; } = 2; // default role = user
-
-        public string Username { get; set; }
-        public string Email { get; set; }
-
-        // hashed password
-        public string PasswordHash { get; set; }
-
-        public string ProfileImage { get; set; }
-        public string Bio { get; set; }
-
-        public bool IsOnline { get; set; } = false;
+        public int RoleId { get; set; } = 2;
+        public string Username { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string PasswordHash { get; set; } = string.Empty;
+        public string? ProfileImage { get; set; }
+        public string? Bio { get; set; }
+        public bool IsOnline { get; set; }
         public DateTime? LastSeen { get; set; }
-
         public DateTime CreatedAt { get; set; }
     }
 }

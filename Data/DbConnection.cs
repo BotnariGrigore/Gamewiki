@@ -1,21 +1,13 @@
-using System.Configuration;
-using MySql.Data.MySqlClient;
+using System.Data;
+using MySqlConnector;
 
 namespace GameWikiApp.Data
 {
     public static class DbConnection
     {
-        private static readonly string _connectionString;
-
-        static DbConnection()
+        public static IDbConnection GetConnection()
         {
-            _connectionString = ConfigurationManager.ConnectionStrings["GameWikiDb"]?.ConnectionString
-                ?? throw new ConfigurationErrorsException("Missing connection string 'GameWikiDb' in App.config.");
-        }
-
-        public static MySqlConnection GetConnection()
-        {
-            return new MySqlConnection(_connectionString);
+            return new MySqlConnection(GameWikiApp.Config.DatabaseConfig.ConnectionString);
         }
     }
 }

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 
 namespace GameWikiApp.Models
 {
@@ -8,23 +7,14 @@ namespace GameWikiApp.Models
         public int ArticleId { get; set; }
         public int GameId { get; set; }
         public int AuthorId { get; set; }
-
-        public string Title { get; set; }
-        public string Slug { get; set; }
-
-        public string Summary { get; set; }
-        public string Content { get; set; }
-
-        public string CoverImage { get; set; }
-
-        public int ViewsCount { get; set; } = 0;
+        public string Title { get; set; } = string.Empty;
+        public string Slug { get; set; } = string.Empty;
+        public string? Summary { get; set; }
+        public string Content { get; set; } = string.Empty;
+        public string? CoverImage { get; set; }
+        public int ViewsCount { get; set; }
         public bool IsPublished { get; set; } = true;
-
         public DateTime CreatedAt { get; set; }
-        public DateTime? UpdatedAt { get; set; }
-
-        // navigation helpers
-        public List<Category> Categories { get; set; } = new List<Category>();
-        public List<Tag> Tags { get; set; } = new List<Tag>();
+        public DateTime UpdatedAt { get; set; }
     }
 }
