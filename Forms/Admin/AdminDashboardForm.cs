@@ -1,407 +1,426 @@
 using System;
-using System.Collections.Generic;
+using System.Data;
 using System.Drawing;
-using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Dapper;
 using GameWikiApp.Data;
 using GameWikiApp.Helpers;
-using GameWikiApp.Models;
-using GameWikiApp.Services;
 
 namespace GameWikiApp.Forms.Admin
 {
     public class AdminDashboardForm : Form
     {
-        private TabControl tabControl;
+        public event EventHandler? LogoutRequested;
 
-        // Users tab
-        private DataGridView dgvUsers;
-        private Button btnExport;
-        private UserRepository _userRepo = new();
+        private Label lblTotalUsers = new();
+        private Label lblTotalAdmins = new();
+        private Label lblTotalNormal = new();
+        private Label lblTotalWiki = new();
+        private TextBox txtSearch = new();
+        private DataGridView dgvUsers = new();
+        private DataGridView dgvWiki = new();
+        private Button btnChangeRole = new();
+        private Button btnDeleteUser = new();
+        private Button btnDeleteWiki = new();
+        private TabControl tabs = new();
 
-        // Games tab
-        private DataGridView dgvGames;
-        private GameService _gameService = new();
-
-        // Articles tab
-        private DataGridView dgvArticles;
-        private ArticleService _articleService = new();
-
-        // Notifications tab
-        private FlowLayoutPanel flpAdminNotifs;
-        private NotificationService _notificationService = new();
+        private int _selectedUserId = -1;
+        private int _selectedWikiId = -1;
 
         public AdminDashboardForm()
         {
             Text = "Admin Dashboard";
-            StartPosition = FormStartPosition.CenterScreen;
-            Size = new Size(1000, 700);
-            MinimumSize = new Size(800, 500);
-
-            InitializeLayout();
-            _ = LoadDataAsync();
+            BackColor = ThemeHelper.BgPrimary;
+            Font = SystemFonts.DefaultFont;
+            Padding = new Padding(0, 0, 0, 4);
+            BuildUI();
         }
 
-        private void InitializeLayout()
+        private void BuildUI()
         {
-            var header = new Panel
+            Controls.Clear();
+
+            // Top stats bar
+            var statsBar = new Panel
             {
-                Height = 64,
+                Height = 90,
                 Dock = DockStyle.Top,
-                Padding = new Padding(20, 14, 20, 14)
-            };
-            Controls.Add(header);
-
-            var lblTitle = ThemeHelper.CreateLabel("Admin Dashboard", 18, FontStyle.Bold, null, 0, 12);
-            header.Controls.Add(lblTitle);
-
-            tabControl = new TabControl
-            {
-                Dock = DockStyle.Fill
+                BackColor = ThemeHelper.BgSecondary,
+                Padding = new Padding(12, 8, 12, 6),
+                BorderStyle = BorderStyle.FixedSingle
             };
 
-            // ── Tab 1: Users ──
-            var tabUsers = new TabPage("Users");
-
-            var pnlUsers = new Panel
+            var statsTable = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(12)
+                ColumnCount = 2,
+                RowCount = 1
             };
-            tabUsers.Controls.Add(pnlUsers);
+            statsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            statsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120F));
 
-            var btnRow1 = new Panel { Height = 36, Dock = DockStyle.Top };
-            pnlUsers.Controls.Add(btnRow1);
-
-            btnExport = ThemeHelper.CreateThemedButton("Export CSV", 0, 4, 140, 30);
-            btnExport.Click += async (_, __) => await ExportCsvAsync();
-            btnRow1.Controls.Add(btnExport);
-
-            var btnRefreshUsers = ThemeHelper.CreateThemedButton("Refresh", 155, 4, 100, 30);
-            btnRefreshUsers.Click += async (_, __) => await LoadUsersAsync();
-            btnRow1.Controls.Add(btnRefreshUsers);
-
-            dgvUsers = new DataGridView
+            var statsFlow = new FlowLayoutPanel
             {
-                Location = new Point(0, 42),
-                Size = new Size(pnlUsers.Width, pnlUsers.Height - 48),
-                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-                AutoGenerateColumns = false,
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = true
+            };
+            MakeStatPanel("Total Users:", ref lblTotalUsers, statsFlow);
+            MakeStatPanel("Admins:", ref lblTotalAdmins, statsFlow);
+            MakeStatPanel("Normal:", ref lblTotalNormal, statsFlow);
+            MakeStatPanel("Wiki Pages:", ref lblTotalWiki, statsFlow);
+            statsTable.Controls.Add(statsFlow, 0, 0);
+
+            var btnLogout = new Button
+            {
+                Text = "Logout",
+                Size = new Size(100, 28),
+                UseVisualStyleBackColor = true,
+                Anchor = AnchorStyles.Right | AnchorStyles.Top,
+                BackColor = Color.FromArgb(220, 53, 69),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat
+            };
+            btnLogout.FlatAppearance.BorderSize = 0;
+            btnLogout.Click += (_, __) => LogoutRequested?.Invoke(this, EventArgs.Empty);
+            statsTable.Controls.Add(btnLogout, 1, 0);
+
+            statsBar.Controls.Add(statsTable);
+            Controls.Add(statsBar);
+
+            // Main content - tabs
+            tabs = new TabControl
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Point(8, 6),
+                Margin = new Padding(4, 0, 4, 0)
+            };
+            tabs.SelectedIndexChanged += (_, __) => LoadDataAsync();
+
+            // Users tab
+            var userTab = new TabPage("Users") { Padding = new Padding(6), BackColor = ThemeHelper.BgPrimary };
+            var userToolbar = new Panel { Height = 64, Dock = DockStyle.Top, BackColor = ThemeHelper.BgTertiary, Padding = new Padding(6) };
+            var userToolbarFlow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = true };
+            txtSearch = new TextBox { PlaceholderText = "Search by username...", Size = new Size(220, 24), BackColor = ThemeHelper.BgInput, ForeColor = ThemeHelper.TextPrimary };
+            txtSearch.TextChanged += async (_, __) => await LoadUsersAsync();
+            userToolbarFlow.Controls.Add(txtSearch);
+            userToolbarFlow.Controls.Add(new Label { Width = 8 });
+            btnChangeRole = new Button { Text = "Change Role", Size = new Size(110, 30), BackColor = Color.FromArgb(255, 193, 7), FlatStyle = FlatStyle.Flat, ForeColor = ThemeHelper.TextPrimary };
+            btnChangeRole.FlatAppearance.BorderSize = 0;
+            btnChangeRole.Click += async (_, __) => await ChangeRoleAsync();
+            btnChangeRole.Enabled = false;
+            userToolbarFlow.Controls.Add(btnChangeRole);
+            btnDeleteUser = new Button { Text = "Delete User", Size = new Size(110, 30), BackColor = Color.FromArgb(220, 53, 69), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+            btnDeleteUser.FlatAppearance.BorderSize = 0;
+            btnDeleteUser.Click += async (_, __) => await DeleteUserAsync();
+            btnDeleteUser.Enabled = false;
+            userToolbarFlow.Controls.Add(btnDeleteUser);
+            userToolbar.Controls.Add(userToolbarFlow);
+            userTab.Controls.Add(userToolbar);
+
+            dgvUsers = BuildStyledGrid();
+            dgvUsers.Columns.Clear();
+            dgvUsers.Columns.Add("Id", "ID");
+            dgvUsers.Columns["Id"].Width = 60;
+            dgvUsers.Columns.Add("Username", "Username");
+            dgvUsers.Columns.Add("Email", "Email");
+            dgvUsers.Columns.Add("Role", "Role");
+            dgvUsers.Columns.Add("Created", "Created");
+            dgvUsers.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            dgvUsers.SelectionChanged += (_, __) =>
+            {
+                _selectedUserId = -1;
+                if (dgvUsers.SelectedRows.Count > 0 && dgvUsers.SelectedRows[0].Cells["Id"].Value != null)
+                    _selectedUserId = Convert.ToInt32(dgvUsers.SelectedRows[0].Cells["Id"].Value);
+                UpdateActionButtons();
+            };
+            userTab.Controls.Add(dgvUsers);
+            tabs.TabPages.Add(userTab);
+
+            // Wiki tab
+            var wikiTab = new TabPage("Wiki Pages") { Padding = new Padding(6), BackColor = ThemeHelper.BgPrimary };
+            var wikiToolbar = new Panel { Height = 64, Dock = DockStyle.Top, BackColor = ThemeHelper.BgTertiary, Padding = new Padding(6) };
+            var wikiToolbarFlow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = true };
+            btnDeleteWiki = new Button { Text = "Delete Page", Size = new Size(110, 30), BackColor = Color.FromArgb(220, 53, 69), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+            btnDeleteWiki.FlatAppearance.BorderSize = 0;
+            btnDeleteWiki.Click += async (_, __) => await DeleteWikiAsync();
+            btnDeleteWiki.Enabled = false;
+            wikiToolbarFlow.Controls.Add(btnDeleteWiki);
+            wikiToolbar.Controls.Add(wikiToolbarFlow);
+            wikiTab.Controls.Add(wikiToolbar);
+
+            dgvWiki = BuildStyledGrid();
+            dgvWiki.Columns.Clear();
+            dgvWiki.Columns.Add("Id", "ID");
+            dgvWiki.Columns["Id"].Width = 60;
+            dgvWiki.Columns.Add("Title", "Title");
+            dgvWiki.Columns.Add("Author", "Author");
+            dgvWiki.Columns.Add("Created", "Created");
+            dgvWiki.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            dgvWiki.SelectionChanged += (_, __) =>
+            {
+                _selectedWikiId = -1;
+                if (dgvWiki.SelectedRows.Count > 0 && dgvWiki.SelectedRows[0].Cells["Id"].Value != null)
+                    _selectedWikiId = Convert.ToInt32(dgvWiki.SelectedRows[0].Cells["Id"].Value);
+                UpdateActionButtons();
+            };
+            wikiTab.Controls.Add(dgvWiki);
+            tabs.TabPages.Add(wikiTab);
+
+            Controls.Add(tabs);
+            LoadDataAsync();
+        }
+
+        // ─── Shared styled DataGridView ───
+        private DataGridView BuildStyledGrid()
+        {
+            return new DataGridView
+            {
+                Dock = DockStyle.Fill,
                 AllowUserToAddRows = false,
                 RowHeadersVisible = false,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
-                AllowUserToResizeRows = false,
-                AllowUserToResizeColumns = true,
-                ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
-            };
-            dgvUsers.EnableHeadersVisualStyles = false;
-
-            dgvUsers.Columns.Add(new DataGridViewTextBoxColumn { Name = "UserId", HeaderText = "ID", DataPropertyName = "UserId", Width = 60, ReadOnly = true });
-            dgvUsers.Columns.Add(new DataGridViewTextBoxColumn { Name = "Username", HeaderText = "Username", DataPropertyName = "Username", Width = 170, ReadOnly = true });
-            dgvUsers.Columns.Add(new DataGridViewTextBoxColumn { Name = "Email", HeaderText = "Email", DataPropertyName = "Email", Width = 220, ReadOnly = true });
-            dgvUsers.Columns.Add(new DataGridViewTextBoxColumn { Name = "Role", HeaderText = "Role", DataPropertyName = "Role", Width = 90, ReadOnly = true });
-            dgvUsers.Columns.Add(new DataGridViewTextBoxColumn { Name = "Created", HeaderText = "Created", DataPropertyName = "CreatedAt", Width = 150, ReadOnly = true });
-
-            var colToggle = new DataGridViewButtonColumn { Name = "ToggleRole", HeaderText = "", Text = "Toggle Role", UseColumnTextForButtonValue = true, Width = 110 };
-            dgvUsers.Columns.Add(colToggle);
-
-            var colDel = new DataGridViewButtonColumn { Name = "Delete", HeaderText = "", Text = "Delete", UseColumnTextForButtonValue = true, Width = 90 };
-            dgvUsers.Columns.Add(colDel);
-
-            dgvUsers.CellContentClick += async (s, e) => await OnUserGridClick(s, e);
-            pnlUsers.Controls.Add(dgvUsers);
-
-            // ── Tab 2: Games ──
-            var tabGames = new TabPage("Games");
-
-            var pnlGames = new Panel
-            {
-                Dock = DockStyle.Fill,
-                Padding = new Padding(12)
-            };
-            tabGames.Controls.Add(pnlGames);
-
-            var btnRow2 = new Panel { Height = 36, Dock = DockStyle.Top };
-            pnlGames.Controls.Add(btnRow2);
-
-            var btnAddGame = ThemeHelper.CreateThemedButton("Add Game", 0, 4, 120, 30);
-            btnAddGame.Click += (_, __) =>
-            {
-                using var f = new GameEditorForm();
-                f.ShowDialog(this);
-                _ = LoadGamesAsync();
-            };
-            btnRow2.Controls.Add(btnAddGame);
-
-            dgvGames = new DataGridView
-            {
-                Location = new Point(0, 42),
-                Size = new Size(pnlGames.Width, pnlGames.Height - 48),
-                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
                 AutoGenerateColumns = false,
-                AllowUserToAddRows = false,
-                RowHeadersVisible = false,
-                AllowUserToResizeRows = false,
-                AllowUserToResizeColumns = true,
-                ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
-            };
-            dgvGames.EnableHeadersVisualStyles = false;
-
-            dgvGames.Columns.Add(new DataGridViewTextBoxColumn { Name = "GameId", HeaderText = "ID", DataPropertyName = "GameId", Width = 60 });
-            dgvGames.Columns.Add(new DataGridViewTextBoxColumn { Name = "Title", HeaderText = "Title", DataPropertyName = "Title", Width = 250 });
-            dgvGames.Columns.Add(new DataGridViewTextBoxColumn { Name = "CreatedAt", HeaderText = "Created", DataPropertyName = "CreatedAt", Width = 150 });
-            dgvGames.Columns.Add(new DataGridViewTextBoxColumn { Name = "CreatedBy", HeaderText = "Author ID", DataPropertyName = "CreatedBy", Width = 90 });
-
-            var colDelGame = new DataGridViewButtonColumn { Name = "DeleteGame", HeaderText = "", Text = "Delete", UseColumnTextForButtonValue = true, Width = 50 };
-            dgvGames.Columns.Add(colDelGame);
-
-            dgvGames.CellContentClick += async (s, e) => await OnGameGridClick(s, e);
-            pnlGames.Controls.Add(dgvGames);
-
-            // ── Tab 3: Notifications ──
-            var tabNotifs = new TabPage("System Notifications");
-
-            var pnlNotifs = new Panel
-            {
-                Dock = DockStyle.Fill,
-                Padding = new Padding(12)
-            };
-            tabNotifs.Controls.Add(pnlNotifs);
-
-            var btnRefreshNotifs = ThemeHelper.CreateThemedButton("Refresh", 0, 8, 120, 30);
-            btnRefreshNotifs.Click += async (_, __) => await LoadNotificationsAsync();
-            pnlNotifs.Controls.Add(btnRefreshNotifs);
-
-            flpAdminNotifs = new FlowLayoutPanel
-            {
-                Location = new Point(0, 46),
-                Size = new Size(pnlNotifs.Width, pnlNotifs.Height - 52),
-                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-                AutoScroll = true,
-                FlowDirection = FlowDirection.TopDown,
-                WrapContents = false
-            };
-            pnlNotifs.Controls.Add(flpAdminNotifs);
-
-            // Add tabs
-            tabControl.TabPages.Add(tabUsers);
-            tabControl.TabPages.Add(tabGames);
-            tabControl.TabPages.Add(tabNotifs);
-
-            Controls.Add(tabControl);
-
-            Resize += (_, __) =>
-            {
-                dgvUsers.Size = new Size(pnlUsers.Width, pnlUsers.Height - 48);
-                dgvGames.Size = new Size(pnlGames.Width, pnlGames.Height - 48);
-                flpAdminNotifs.Size = new Size(pnlNotifs.Width, pnlNotifs.Height - 52);
+                ReadOnly = true,
+                BackColor = ThemeHelper.BgPrimary,
+                BackgroundColor = ThemeHelper.BgPrimary,
+                ForeColor = ThemeHelper.TextPrimary,
+                GridColor = ThemeHelper.Border,
+                BorderStyle = BorderStyle.Fixed3D,
+                RowTemplate = new DataGridViewRow
+                {
+                    Height = 30,
+                    DefaultCellStyle = new DataGridViewCellStyle
+                    {
+                        BackColor = ThemeHelper.BgPrimary,
+                        ForeColor = ThemeHelper.TextPrimary,
+                        SelectionBackColor = ThemeHelper.Accent,
+                        SelectionForeColor = Color.White,
+                        Padding = new Padding(4, 0, 0, 0)
+                    }
+                },
+                AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle
+                {
+                    BackColor = ThemeHelper.BgSecondary,
+                    ForeColor = ThemeHelper.TextPrimary
+                },
+                ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+                {
+                    BackColor = ThemeHelper.BgSecondary,
+                    ForeColor = ThemeHelper.TextPrimary,
+                    Font = new Font(SystemFonts.DefaultFont.FontFamily, 9, FontStyle.Bold),
+                    Alignment = DataGridViewContentAlignment.MiddleLeft,
+                    Padding = new Padding(4, 0, 0, 0)
+                },
+                ColumnHeadersHeight = 32
             };
         }
 
-        private async Task LoadDataAsync()
+        private void UpdateActionButtons()
         {
-            await LoadUsersAsync();
-            await LoadGamesAsync();
-            await LoadNotificationsAsync();
+            btnChangeRole.Enabled = _selectedUserId > 0;
+            btnDeleteUser.Enabled = _selectedUserId > 0;
+            btnDeleteWiki.Enabled = _selectedWikiId > 0;
+        }
+
+        // ─── Stat panel helper ───
+        private void MakeStatPanel(string text, ref Label valueLabel, FlowLayoutPanel parent)
+        {
+            var panel = new Panel
+            {
+                Width = 150,
+                Height = 36,
+                Margin = new Padding(0, 0, 12, 4),
+                BackColor = ThemeHelper.BgCard,
+                Padding = new Padding(8, 2, 4, 2)
+            };
+            panel.Controls.Add(new Label
+            {
+                Text = text,
+                Location = new Point(4, 2),
+                AutoSize = true,
+                ForeColor = ThemeHelper.TextMuted,
+                Font = new Font(SystemFonts.DefaultFont.FontFamily, 8)
+            });
+            valueLabel = new Label
+            {
+                Text = "0",
+                Location = new Point(4, 16),
+                Font = new Font(SystemFonts.DefaultFont.FontFamily, 11, FontStyle.Bold),
+                AutoSize = true,
+                ForeColor = ThemeHelper.TextPrimary
+            };
+            panel.Controls.Add(valueLabel);
+            parent.Controls.Add(panel);
+        }
+
+        // ─── Data loading ───
+        private async void LoadDataAsync()
+        {
+            try
+            {
+                using var conn = DbConnection.GetOpen();
+                var totalUsers = await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM users");
+                var totalAdmins = await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM users WHERE role_id = 1");
+                var totalWiki = await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM wiki_articles");
+
+                lblTotalUsers.Text = totalUsers.ToString();
+                lblTotalAdmins.Text = totalAdmins.ToString();
+                lblTotalNormal.Text = (totalUsers - totalAdmins).ToString();
+                lblTotalWiki.Text = totalWiki.ToString();
+
+                if (tabs.SelectedIndex == 0) await LoadUsersAsync();
+                else await LoadWikiAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error loading dashboard data: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private async Task LoadUsersAsync()
         {
             try
             {
-                var list = (await _userRepo.GetAllAsync()).ToList();
-                dgvUsers.DataSource = list.Select(u => new
-                {
-                    u.UserId,
-                    u.Username,
-                    u.Email,
-                    Role = u.RoleId == 1 ? "Admin" : "User",
-                    CreatedAt = u.CreatedAt.ToString("yyyy-MM-dd HH:mm")
-                }).ToList();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Failed loading users: " + ex.Message, "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
+                using var conn = DbConnection.GetOpen();
+                var q = txtSearch.Text.Trim();
+                var sql = "SELECT u.user_id, u.username, u.email, u.created_at, r.role_name FROM users u JOIN roles r ON u.role_id = r.role_id";
+                if (!string.IsNullOrEmpty(q))
+                    sql += " WHERE u.username LIKE @Q";
+                sql += " ORDER BY u.created_at DESC";
 
-        private async Task OnUserGridClick(object sender, DataGridViewCellEventArgs e)
-        {
-            if (e.RowIndex < 0) return;
-            var grid = (DataGridView)sender;
-            var row = grid.Rows[e.RowIndex];
-
-            if (grid.Columns[e.ColumnIndex].Name == "ToggleRole")
-            {
-                try
-                {
-                    var id = Convert.ToInt32(row.Cells["UserId"].Value);
-                    var currentRole = row.Cells["Role"].Value?.ToString()?.Contains("Admin") == true ? 1 : 2;
-                    var newRole = currentRole == 1 ? 2 : 1;
-                    var ok = await _userRepo.UpdateRoleAsync(id, newRole);
-                    if (ok)
-                    {
-                        await LoadUsersAsync();
-                        MessageBox.Show($"Role updated for user #{id}.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Failed to change role: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            }
-            else if (grid.Columns[e.ColumnIndex].Name == "Delete")
-            {
-                try
-                {
-                    var id = Convert.ToInt32(row.Cells["UserId"].Value);
-                    var username = row.Cells["Username"].Value?.ToString() ?? "";
-                    var result = MessageBox.Show($"Delete user '{username}' (ID {id})?\nThis will also delete their articles and comments.\nThis action cannot be undone.",
-                        "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
-
-                    if (result == DialogResult.Yes)
-                    {
-                        var ok = await _userRepo.DeleteAsync(id);
-                        if (ok) await LoadUsersAsync();
-                        else MessageBox.Show("Failed to delete user.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Failed to delete user: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            }
-        }
-
-        private async Task LoadGamesAsync()
-        {
-            try
-            {
-                var games = await _gameService.GetAllAsync();
-                dgvGames.DataSource = games.Select(g => new
-                {
-                    g.GameId,
-                    g.Title,
-                    CreatedAt = g.CreatedAt.ToString("yyyy-MM-dd HH:mm"),
-                    g.CreatedBy
-                }).ToList();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Failed loading games: " + ex.Message, "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private async Task OnGameGridClick(object sender, DataGridViewCellEventArgs e)
-        {
-            if (e.RowIndex < 0) return;
-            var grid = (DataGridView)sender;
-            if (grid.Columns[e.ColumnIndex].Name == "DeleteGame")
-            {
-                var id = Convert.ToInt32(grid.Rows[e.RowIndex].Cells["GameId"].Value);
-                var title = grid.Rows[e.RowIndex].Cells["Title"].Value?.ToString() ?? "";
-                var result = MessageBox.Show($"Delete game '{title}' (ID {id})?\nAll related articles will also be deleted.",
-                    "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
-
-                if (result == DialogResult.Yes)
+                var users = await conn.QueryAsync(sql, new { Q = $"%{q}%" });
+                dgvUsers.Rows.Clear();
+                _selectedUserId = -1;
+                UpdateActionButtons();
+                foreach (var u in users)
                 {
                     try
                     {
-                        var ok = await _gameService.DeleteAsync(id);
-                        if (ok) await LoadGamesAsync();
-                        else MessageBox.Show("Failed to delete game.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        int id = Convert.ToInt32(u.user_id);
+                        string username = (u.username != null && !(u.username is DBNull)) ? u.username.ToString() : string.Empty;
+                        string email = (u.email != null && !(u.email is DBNull)) ? u.email.ToString() : string.Empty;
+                        string roleName = (u.role_name != null && !(u.role_name is DBNull)) ? u.role_name.ToString() : string.Empty;
+                        string role = roleName.Equals("admin", StringComparison.OrdinalIgnoreCase) ? "Admin" : "User";
+                        string created = string.Empty;
+                        if (u.created_at != null && !(u.created_at is DBNull))
+                        {
+                            if (DateTime.TryParse(u.created_at.ToString(), out DateTime dt))
+                                created = dt.ToString("yyyy-MM-dd");
+                        }
+                        dgvUsers.Rows.Add(id, username, email, role, created);
                     }
-                    catch (Exception ex)
+                    catch (Exception exRow)
                     {
-                        MessageBox.Show("Failed to delete: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        System.Diagnostics.Debug.WriteLine("Skipped user row due to: " + exRow.Message);
                     }
-                }
-            }
-        }
-
-        private async Task LoadNotificationsAsync()
-        {
-            try
-            {
-                flpAdminNotifs.Controls.Clear();
-                var allUsers = await _userRepo.GetAllAsync();
-                var notifRepo = new NotificationRepository();
-
-                var recentNotifs = new List<Notification>();
-                foreach (var user in allUsers)
-                {
-                    var notifs = await notifRepo.GetByUserIdAsync(user.UserId, false, 5);
-                    recentNotifs.AddRange(notifs);
-                }
-
-                recentNotifs = recentNotifs.OrderByDescending(n => n.CreatedAt).Take(30).ToList();
-
-                foreach (var n in recentNotifs)
-                {
-                    var card = ThemeHelper.CreateCardPanel(flpAdminNotifs.Width - 10, 55);
-                    var user = allUsers.FirstOrDefault(u => u.UserId == n.UserId);
-
-                    var lblInfo = ThemeHelper.CreateLabel(
-                        $"[User #{n.UserId}] {n.Title}", 9.5f, FontStyle.Bold, null, 10, 5);
-                    card.Controls.Add(lblInfo);
-
-                    var lblMsg = ThemeHelper.CreateLabel(n.Message, 8.5f, FontStyle.Regular, null, 10, 25);
-                    lblMsg.MaximumSize = new Size(card.Width - 120, 40);
-                    card.Controls.Add(lblMsg);
-
-                    var lblDate = ThemeHelper.CreateLabel(n.CreatedAt.ToString("MMM dd HH:mm"), 8, FontStyle.Regular, null, card.Width - 110, 5);
-                    card.Controls.Add(lblDate);
-
-                    flpAdminNotifs.Controls.Add(card);
-                }
-
-                if (!recentNotifs.Any())
-                {
-                    flpAdminNotifs.Controls.Add(new Label
-                    {
-                        Text = "No notifications found in the system.",
-                        AutoSize = true,
-                        Margin = new Padding(12)
-                    });
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Failed to load notifications: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Error loading users: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private async Task ExportCsvAsync()
+        private async Task LoadWikiAsync()
         {
             try
             {
-                var users = await _userRepo.GetAllAsync();
-                using var sfd = new SaveFileDialog { Filter = "CSV files (*.csv)|*.csv", FileName = "users_export.csv" };
-                if (sfd.ShowDialog(this) != DialogResult.OK) return;
-
-                var sb = new StringBuilder();
-                sb.AppendLine("UserId,Username,Email,Role,CreatedAt");
-                foreach (var u in users)
+                using var conn = DbConnection.GetOpen();
+                var pages = await conn.QueryAsync(@"SELECT a.article_id, a.title, a.created_at, u.username FROM wiki_articles a JOIN users u ON a.author_id = u.user_id ORDER BY a.created_at DESC");
+                dgvWiki.Rows.Clear();
+                _selectedWikiId = -1;
+                UpdateActionButtons();
+                foreach (var p in pages)
                 {
-                    var role = u.RoleId == 1 ? "admin" : "user";
-                    var line = $"\"{u.UserId}\",\"{Escape(u.Username)}\",\"{Escape(u.Email)}\",\"{role}\",\"{u.CreatedAt:O}\"";
-                    sb.AppendLine(line);
+                    try
+                    {
+                        int id = Convert.ToInt32(p.article_id);
+                        string title = (p.title != null && !(p.title is DBNull)) ? p.title.ToString() : string.Empty;
+                        string author = (p.username != null && !(p.username is DBNull)) ? p.username.ToString() : string.Empty;
+                        string created = string.Empty;
+                        if (p.created_at != null && !(p.created_at is DBNull))
+                        {
+                            if (DateTime.TryParse(p.created_at.ToString(), out DateTime dt))
+                                created = dt.ToString("yyyy-MM-dd");
+                        }
+                        dgvWiki.Rows.Add(id, title, author, created);
+                    }
+                    catch (Exception exRow)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Skipped wiki row due to: " + exRow.Message);
+                    }
                 }
-                await File.WriteAllTextAsync(sfd.FileName, sb.ToString(), Encoding.UTF8);
-                MessageBox.Show($"Exported {users.Count()} users to CSV.", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Export failed: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Error loading wiki pages: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private string Escape(string? v) => (v ?? "").Replace("\"", "\"\"");
+        // ─── Actions ───
+        private async Task ChangeRoleAsync()
+        {
+            if (_selectedUserId <= 0) { MessageBox.Show("Please select a user first.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            try
+            {
+                using var conn = DbConnection.GetOpen();
+                var cur = await conn.ExecuteScalarAsync<int>("SELECT role_id FROM users WHERE user_id=@Id", new { Id = _selectedUserId });
+                var newRole = cur == 1 ? 2 : 1;
+                var name = newRole == 1 ? "Admin" : "User";
+                if (MessageBox.Show($"Change selected user to {name}?", "Confirm Role Change", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                {
+                    await conn.ExecuteAsync("UPDATE users SET role_id=@R WHERE user_id=@Id", new { Id = _selectedUserId, R = newRole });
+                    await LoadUsersAsync();
+                    LoadDataAsync();
+                    lblTotalAdmins.Text = (await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM users WHERE role_id = 1")).ToString();
+                }
+            }
+            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        }
+
+        private async Task DeleteUserAsync()
+        {
+            if (_selectedUserId <= 0) { MessageBox.Show("Please select a user first.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            if (MessageBox.Show("Delete this user permanently?", "Confirm Deletion", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+            {
+                try
+                {
+                    using var conn = DbConnection.GetOpen();
+                    await conn.ExecuteAsync("DELETE FROM users WHERE user_id=@Id", new { Id = _selectedUserId });
+                    _selectedUserId = -1;
+                    await LoadUsersAsync();
+                    LoadDataAsync();
+                }
+                catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            }
+        }
+
+        private async Task DeleteWikiAsync()
+        {
+            if (_selectedWikiId <= 0)
+            {
+                MessageBox.Show("Please select a wiki page first.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            if (MessageBox.Show("Delete this page permanently?", "Confirm Deletion", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+            {
+                try
+                {
+                    using var conn = DbConnection.GetOpen();
+                    await conn.ExecuteAsync("DELETE FROM wiki_articles WHERE article_id=@Id", new { Id = _selectedWikiId });
+                    _selectedWikiId = -1;
+                    await LoadWikiAsync();
+                    LoadDataAsync();
+                    UpdateActionButtons();
+                }
+                catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            }
+        }
+
     }
+
 }

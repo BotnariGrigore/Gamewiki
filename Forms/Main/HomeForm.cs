@@ -219,12 +219,18 @@ namespace GameWikiApp.Forms.Main
             };
 
             // Icon (or text)
-            container.Controls.Add(new Label
+            var lbl = new Label
             {
                 Text = icon,
                 Location = new Point(14, 8),
-                AutoSize = true
-            });
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            container.Controls.Add(lbl);
+
+            // Add click handler
+            container.Click += (_, __) => OnMenuItemClick(container, tag);
+            lbl.Click += (_, __) => OnMenuItemClick(container, tag);
 
             return container;
         }
@@ -355,6 +361,9 @@ namespace GameWikiApp.Forms.Main
         {
             ClearActivePage();
 
+            // Restore padding for home page
+            contentPanel.Padding = new Padding(CONTENT_PADDING);
+
             var page = new Panel { Tag = "home", Dock = DockStyle.Fill };
 
             // ── Hero ──
@@ -389,12 +398,18 @@ namespace GameWikiApp.Forms.Main
             page.Controls.Add(hero);
 
             // ── Section title ──
-            page.Controls.Add(new Label
+            var sectionHeader = new Panel
+            {
+                Height = 30,
+                Dock = DockStyle.Top
+            };
+            sectionHeader.Controls.Add(new Label
             {
                 Text = "Popular Games",
                 AutoSize = true,
-                Margin = new Padding(0, 0, 0, 16)
+                Location = new Point(0, 4)
             });
+            page.Controls.Add(sectionHeader);
 
             // ── Game grid ──
             var grid = new FlowLayoutPanel
@@ -517,13 +532,35 @@ namespace GameWikiApp.Forms.Main
 
         private void SwitchToAdmin()
         {
-            if (SessionManager.CurrentUser?.RoleId != 1)
-            {
-                MessageBox.Show("Access denied.", "Forbidden", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
             ClearActivePage();
-            adminDashboard = new AdminDashboardForm { TopLevel = false, FormBorderStyle = FormBorderStyle.None, Tag = "admin", Dock = DockStyle.Fill };
+
+            // Remove padding from contentPanel so the dashboard fills the area
+            contentPanel.Padding = new Padding(0);
+
+            // Dispose old instance
+            if (adminDashboard != null)
+            {
+                try { adminDashboard.Dispose(); } catch { }
+                adminDashboard = null;
+            }
+
+            adminDashboard = new AdminDashboardForm();
+            adminDashboard.LogoutRequested += (_, __) =>
+            {
+                contentPanel.Controls.Clear();
+                if (adminDashboard != null)
+                {
+                    try { adminDashboard.Dispose(); } catch { }
+                    adminDashboard = null;
+                }
+                SessionManager.EndSession();
+                Close();
+                new Auth.LoginForm().Show();
+            };
+            adminDashboard.TopLevel = false;
+            adminDashboard.FormBorderStyle = FormBorderStyle.None;
+            adminDashboard.Tag = "admin";
+            adminDashboard.Dock = DockStyle.Fill;
             contentPanel.Controls.Add(adminDashboard);
             adminDashboard.Show();
         }
