@@ -1,6 +1,8 @@
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
-using System.Linq;
 using GameWikiApp.Models;
 
 namespace GameWikiApp.Data
@@ -21,6 +23,20 @@ namespace GameWikiApp.Data
             return (await conn.QueryAsync<User>(sql, new { Email = email })).FirstOrDefault();
         }
 
+        public async Task<User?> GetByIdAsync(int id)
+        {
+            using var conn = GetOpen();
+            var sql = "SELECT * FROM users WHERE user_id = @Id LIMIT 1";
+            return await conn.QueryFirstOrDefaultAsync<User>(sql, new { Id = id });
+        }
+
+        public async Task<IEnumerable<User>> GetAllAsync()
+        {
+            using var conn = GetOpen();
+            var sql = "SELECT * FROM users ORDER BY created_at DESC";
+            return await conn.QueryAsync<User>(sql);
+        }
+
         public async Task<int> CreateAsync(User user)
         {
             using var conn = GetOpen();
@@ -30,7 +46,32 @@ namespace GameWikiApp.Data
             return await conn.ExecuteScalarAsync<int>(sql, user);
         }
 
-        private System.Data.IDbConnection GetOpen()
+        public async Task<bool> UpdateAsync(User user)
+        {
+            using var conn = GetOpen();
+            var sql = @"UPDATE users SET username = @Username, email = @Email, profile_image = @ProfileImage, bio = @Bio, is_online = @IsOnline, last_seen = @LastSeen
+                        WHERE user_id = @UserId";
+            var res = await conn.ExecuteAsync(sql, user);
+            return res > 0;
+        }
+
+        public async Task<bool> UpdateRoleAsync(int userId, int roleId)
+        {
+            using var conn = GetOpen();
+            var sql = "UPDATE users SET role_id = @RoleId WHERE user_id = @UserId";
+            var res = await conn.ExecuteAsync(sql, new { UserId = userId, RoleId = roleId });
+            return res > 0;
+        }
+
+        public async Task<bool> DeleteAsync(int id)
+        {
+            using var conn = GetOpen();
+            var sql = "DELETE FROM users WHERE user_id = @Id";
+            var res = await conn.ExecuteAsync(sql, new { Id = id });
+            return res > 0;
+        }
+
+        private IDbConnection GetOpen()
         {
             var c = DbConnection.GetConnection();
             c.Open();

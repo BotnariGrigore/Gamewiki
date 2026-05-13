@@ -4,6 +4,7 @@ using System.Drawing.Drawing2D;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using GameWikiApp.Services;
+using GameWikiApp.Helpers;
 
 namespace GameWikiApp.Forms.Auth
 {
@@ -18,16 +19,6 @@ namespace GameWikiApp.Forms.Auth
 
         private readonly AuthService _auth = new();
 
-        // Colors matching LoginForm
-        private readonly Color BackColorDark = Color.FromArgb(18, 18, 30);
-        private readonly Color CardColor = Color.FromArgb(28, 28, 48);
-        private readonly Color AccentColor = Color.FromArgb(0, 180, 216);
-        private readonly Color AccentHover = Color.FromArgb(0, 150, 200);
-        private readonly Color TextColor = Color.FromArgb(220, 220, 240);
-        private readonly Color MutedText = Color.FromArgb(140, 140, 170);
-        private readonly Color InputBg = Color.FromArgb(38, 38, 60);
-        private readonly Color BorderColor = Color.FromArgb(60, 60, 90);
-
         public RegisterForm()
         {
             InitializeForm();
@@ -36,259 +27,177 @@ namespace GameWikiApp.Forms.Auth
 
         private void InitializeForm()
         {
-            Text = "GameWiki - Create Account";
+            Text = "Nexoria - Create Account";
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(440, 600);
+            ClientSize = new Size(460, 620);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
-            BackColor = BackColorDark;
-            ForeColor = TextColor;
+            BackColor = ThemeHelper.BgPrimary;
+            ForeColor = ThemeHelper.TextPrimary;
             Font = new Font("Segoe UI", 10);
         }
 
         private void InitializeControls()
         {
-            // ── Card panel ──
             var card = new Panel
             {
-                Size = new Size(380, 520),
-                Location = new Point((ClientSize.Width - 380) / 2, (ClientSize.Height - 520) / 2),
-                BackColor = CardColor,
+                Size = new Size(400, 540),
+                Location = new Point((ClientSize.Width - 400) / 2, (ClientSize.Height - 540) / 2),
+                BackColor = ThemeHelper.BgSecondary,
             };
             card.Paint += (s, e) =>
             {
-                using var path = GetRoundedPath(card.ClientRectangle, 12);
-                using var brush = new SolidBrush(CardColor);
+                using var path = ThemeHelper.GetRoundedPath(card.ClientRectangle, 16);
+                using var brush = new SolidBrush(card.BackColor);
+                using var pen = new Pen(ThemeHelper.BorderLight, 1);
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 e.Graphics.FillPath(brush, path);
-                using var pen = new Pen(BorderColor, 1);
                 e.Graphics.DrawPath(pen, path);
             };
             Controls.Add(card);
 
-            // ── Logo / Title ──
+            // Logo
             var lblIcon = new Label
             {
                 Text = "🚀",
-                Font = new Font("Segoe UI", 36),
-                ForeColor = AccentColor,
+                Font = new Font("Segoe UI", 40),
+                ForeColor = ThemeHelper.Accent,
                 AutoSize = true,
-                Location = new Point(170, 16)
+                Location = new Point(168, 18)
             };
             card.Controls.Add(lblIcon);
 
-            var lblTitle = new Label
-            {
-                Text = "Create Account",
-                Font = new Font("Segoe UI", 20, FontStyle.Bold),
-                ForeColor = TextColor,
-                AutoSize = true,
-                Location = new Point((380 - TextRenderer.MeasureText("Create Account", new Font("Segoe UI", 20, FontStyle.Bold)).Width) / 2, 68)
-            };
+            var lblTitle = ThemeHelper.CreateLabel("Create Account", 22, FontStyle.Bold, ThemeHelper.TextPrimary,
+                (card.Width - TextRenderer.MeasureText("Create Account", new Font("Segoe UI", 22, FontStyle.Bold)).Width) / 2, 72);
             card.Controls.Add(lblTitle);
 
-            var lblSubtitle = new Label
-            {
-                Text = "Join the GameWiki community",
-                Font = new Font("Segoe UI", 10),
-                ForeColor = MutedText,
-                AutoSize = true,
-                Location = new Point((380 - TextRenderer.MeasureText("Join the GameWiki community", new Font("Segoe UI", 10)).Width) / 2, 100)
-            };
+            var lblSubtitle = ThemeHelper.CreateLabel("Join the Nexoria community today", 10, FontStyle.Regular, ThemeHelper.TextSecondary,
+                (card.Width - TextRenderer.MeasureText("Join the Nexoria community today", new Font("Segoe UI", 10)).Width) / 2, 104);
             card.Controls.Add(lblSubtitle);
 
-            // ── Username ──
-            var lblUser = new Label
-            {
-                Text = "  👤  Username",
-                Font = new Font("Segoe UI", 9.5f),
-                ForeColor = MutedText,
-                AutoSize = true,
-                Location = new Point(30, 136)
-            };
+            // Username
+            var lblUser = ThemeHelper.CreateLabel("👤  Username", 10, FontStyle.Regular, ThemeHelper.TextSecondary, 30, 148);
             card.Controls.Add(lblUser);
 
             txtUsername = new TextBox
             {
-                Location = new Point(30, 160),
-                Size = new Size(320, 36),
-                BackColor = InputBg,
-                ForeColor = TextColor,
+                PlaceholderText = "Choose a username",
+                Location = new Point(30, 173),
+                Size = new Size(340, 40),
+                BackColor = ThemeHelper.BgInput,
+                ForeColor = ThemeHelper.TextPrimary,
                 BorderStyle = BorderStyle.None,
                 Font = new Font("Segoe UI", 11),
-                Text = ""
             };
-            txtUsername.Enter += (_, __) => txtUsername.BackColor = Color.FromArgb(48, 48, 75);
-            txtUsername.Leave += (_, __) => txtUsername.BackColor = InputBg;
-            WrapTextBox(card, txtUsername);
+            txtUsername.Enter += (_, __) => txtUsername.BackColor = ThemeHelper.BgTertiary;
+            txtUsername.Leave += (_, __) => txtUsername.BackColor = ThemeHelper.BgInput;
+            var wrap1 = ThemeHelper.WrapInput(txtUsername, 346, 44);
+            wrap1.Location = new Point(27, 171);
+            card.Controls.Add(wrap1);
 
-            // ── Email ──
-            var lblEmail = new Label
-            {
-                Text = "  📧  Email",
-                Font = new Font("Segoe UI", 9.5f),
-                ForeColor = MutedText,
-                AutoSize = true,
-                Location = new Point(30, 208)
-            };
+            // Email
+            var lblEmail = ThemeHelper.CreateLabel("📧  Email", 10, FontStyle.Regular, ThemeHelper.TextSecondary, 30, 222);
             card.Controls.Add(lblEmail);
 
             txtEmail = new TextBox
             {
-                Location = new Point(30, 232),
-                Size = new Size(320, 36),
-                BackColor = InputBg,
-                ForeColor = TextColor,
+                PlaceholderText = "you@example.com",
+                Location = new Point(30, 247),
+                Size = new Size(340, 40),
+                BackColor = ThemeHelper.BgInput,
+                ForeColor = ThemeHelper.TextPrimary,
                 BorderStyle = BorderStyle.None,
-                Font = new Font("Segoe UI", 11)
+                Font = new Font("Segoe UI", 11),
             };
-            txtEmail.Enter += (_, __) => txtEmail.BackColor = Color.FromArgb(48, 48, 75);
-            txtEmail.Leave += (_, __) => txtEmail.BackColor = InputBg;
-            WrapTextBox(card, txtEmail);
+            txtEmail.Enter += (_, __) => txtEmail.BackColor = ThemeHelper.BgTertiary;
+            txtEmail.Leave += (_, __) => txtEmail.BackColor = ThemeHelper.BgInput;
+            var wrap2 = ThemeHelper.WrapInput(txtEmail, 346, 44);
+            wrap2.Location = new Point(27, 245);
+            card.Controls.Add(wrap2);
 
-            // ── Password ──
-            var lblPass = new Label
-            {
-                Text = "  🔒  Password",
-                Font = new Font("Segoe UI", 9.5f),
-                ForeColor = MutedText,
-                AutoSize = true,
-                Location = new Point(30, 280)
-            };
+            // Password
+            var lblPass = ThemeHelper.CreateLabel("🔒  Password", 10, FontStyle.Regular, ThemeHelper.TextSecondary, 30, 298);
             card.Controls.Add(lblPass);
 
             txtPassword = new TextBox
             {
-                Location = new Point(30, 304),
-                Size = new Size(320, 36),
-                BackColor = InputBg,
-                ForeColor = TextColor,
+                PlaceholderText = "Min 8 chars with A-Z, a-z, 0-9, symbol",
+                Location = new Point(30, 323),
+                Size = new Size(340, 40),
+                BackColor = ThemeHelper.BgInput,
+                ForeColor = ThemeHelper.TextPrimary,
                 BorderStyle = BorderStyle.None,
                 Font = new Font("Segoe UI", 11),
                 UseSystemPasswordChar = true
             };
-            txtPassword.Enter += (_, __) => txtPassword.BackColor = Color.FromArgb(48, 48, 75);
-            txtPassword.Leave += (_, __) => txtPassword.BackColor = InputBg;
-            WrapTextBox(card, txtPassword);
+            txtPassword.Enter += (_, __) => txtPassword.BackColor = ThemeHelper.BgTertiary;
+            txtPassword.Leave += (_, __) => txtPassword.BackColor = ThemeHelper.BgInput;
+            var wrap3 = ThemeHelper.WrapInput(txtPassword, 346, 44);
+            wrap3.Location = new Point(27, 321);
+            card.Controls.Add(wrap3);
 
-            // ── Confirm ──
-            var lblConfirm = new Label
-            {
-                Text = "  ✅  Confirm Password",
-                Font = new Font("Segoe UI", 9.5f),
-                ForeColor = MutedText,
-                AutoSize = true,
-                Location = new Point(30, 352)
-            };
+            // Confirm
+            var lblConfirm = ThemeHelper.CreateLabel("✅  Confirm Password", 10, FontStyle.Regular, ThemeHelper.TextSecondary, 30, 376);
             card.Controls.Add(lblConfirm);
 
             txtConfirm = new TextBox
             {
-                Location = new Point(30, 376),
-                Size = new Size(320, 36),
-                BackColor = InputBg,
-                ForeColor = TextColor,
+                PlaceholderText = "Repeat password",
+                Location = new Point(30, 401),
+                Size = new Size(340, 40),
+                BackColor = ThemeHelper.BgInput,
+                ForeColor = ThemeHelper.TextPrimary,
                 BorderStyle = BorderStyle.None,
                 Font = new Font("Segoe UI", 11),
                 UseSystemPasswordChar = true
             };
-            txtConfirm.Enter += (_, __) => txtConfirm.BackColor = Color.FromArgb(48, 48, 75);
-            txtConfirm.Leave += (_, __) => txtConfirm.BackColor = InputBg;
-            WrapTextBox(card, txtConfirm);
+            txtConfirm.Enter += (_, __) => txtConfirm.BackColor = ThemeHelper.BgTertiary;
+            txtConfirm.Leave += (_, __) => txtConfirm.BackColor = ThemeHelper.BgInput;
+            var wrap4 = ThemeHelper.WrapInput(txtConfirm, 346, 44);
+            wrap4.Location = new Point(27, 399);
+            card.Controls.Add(wrap4);
 
-            // ── Error label ──
+            // Error
             lblError = new Label
             {
-                Text = "",
                 Font = new Font("Segoe UI", 9),
-                ForeColor = Color.FromArgb(255, 100, 100),
+                ForeColor = ThemeHelper.Error,
                 AutoSize = true,
-                Location = new Point(30, 424),
+                Location = new Point(30, 455),
                 Visible = false
             };
             card.Controls.Add(lblError);
 
-            // ── Register button ──
-            btnRegister = new Button
-            {
-                Text = "Create Account",
-                Location = new Point(30, 442),
-                Size = new Size(320, 42),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = AccentColor,
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 12, FontStyle.Bold),
-                Cursor = Cursors.Hand,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
+            // Register button
+            btnRegister = ThemeHelper.CreateThemedButton("Create Account", 30, 472, 340, 44);
+            btnRegister.Font = new Font("Segoe UI", 13, FontStyle.Bold);
             btnRegister.FlatAppearance.BorderSize = 0;
-            btnRegister.Paint += (s, e) =>
-            {
-                var btn = (Button)s;
-                using var path = GetRoundedPath(new Rectangle(0, 0, btn.Width, btn.Height), 8);
-                using var brush = new LinearGradientBrush(btn.ClientRectangle, Color.FromArgb(72, 0, 180), AccentColor, LinearGradientMode.Horizontal);
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                e.Graphics.FillPath(brush, path);
-                TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, btn.ClientRectangle, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-            };
-            btnRegister.MouseEnter += (_, __) => { btnRegister.BackColor = AccentHover; btnRegister.Invalidate(); };
-            btnRegister.MouseLeave += (_, __) => { btnRegister.BackColor = AccentColor; btnRegister.Invalidate(); };
             btnRegister.Click += async (_, __) => await OnRegister();
             card.Controls.Add(btnRegister);
 
-            // ── Login link ──
-            var lblLogin = new Label
-            {
-                Text = "Already have an account?  Sign in",
-                Font = new Font("Segoe UI", 9.5f),
-                ForeColor = MutedText,
-                AutoSize = true,
-                Location = new Point((380 - TextRenderer.MeasureText("Already have an account?  Sign in", new Font("Segoe UI", 9.5f)).Width) / 2, 492),
-                Cursor = Cursors.Hand
-            };
-            lblLogin.MouseEnter += (_, __) => lblLogin.ForeColor = AccentColor;
-            lblLogin.MouseLeave += (_, __) => lblLogin.ForeColor = MutedText;
+            // Divider
+            var divider = ThemeHelper.CreateSeparator(280, 0, 528);
+            divider.Location = new Point((card.Width - 280) / 2, 526);
+            card.Controls.Add(divider);
+
+            var lblOr = ThemeHelper.CreateLabel("or", 10, FontStyle.Bold, ThemeHelper.TextMuted,
+                (card.Width - TextRenderer.MeasureText("or", new Font("Segoe UI", 10, FontStyle.Bold)).Width) / 2, 536);
+            card.Controls.Add(lblOr);
+
+            // Login link
+            var lblLogin = ThemeHelper.CreateLabel("Already have an account?  Sign in", 10, FontStyle.Regular, ThemeHelper.TextMuted,
+                (card.Width - TextRenderer.MeasureText("Already have an account?  Sign in", new Font("Segoe UI", 10)).Width) / 2, 556);
+            lblLogin.Cursor = Cursors.Hand;
+            lblLogin.MouseEnter += (_, __) => lblLogin.ForeColor = ThemeHelper.Accent;
+            lblLogin.MouseLeave += (_, __) => lblLogin.ForeColor = ThemeHelper.TextMuted;
             lblLogin.Click += (_, __) => Close();
             card.Controls.Add(lblLogin);
 
+            // Password requirements hint
+            var hint = ThemeHelper.CreateLabel("⚠ At least 8 characters, 1 uppercase, 1 lowercase, 1 number, 1 special character", 8.5f, FontStyle.Regular, ThemeHelper.TextMuted, 30, 500);
+            card.Controls.Add(hint);
+
             AcceptButton = btnRegister;
-        }
-
-        private void WrapTextBox(Control parent, TextBox tb)
-        {
-            var wrapper = new Panel
-            {
-                Location = tb.Location,
-                Size = tb.Size,
-                BackColor = tb.BackColor
-            };
-            wrapper.Paint += (s, e) =>
-            {
-                using var path = GetRoundedPath(new Rectangle(0, 0, wrapper.Width, wrapper.Height), 8);
-                using var brush = new SolidBrush(wrapper.BackColor);
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                e.Graphics.FillPath(brush, path);
-                using var pen = new Pen(BorderColor, 1);
-                e.Graphics.DrawPath(pen, path);
-            };
-            tb.Location = new Point(12, 8);
-            tb.Size = new Size(wrapper.Width - 24, wrapper.Height - 16);
-            tb.BackColor = wrapper.BackColor;
-            parent.Controls.Add(wrapper);
-            parent.Controls.Remove(tb);
-            wrapper.Controls.Add(tb);
-        }
-
-        private GraphicsPath GetRoundedPath(Rectangle rect, int radius)
-        {
-            var path = new GraphicsPath();
-            int d = radius * 2;
-            path.AddArc(rect.X, rect.Y, d, d, 180, 90);
-            path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
-            path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
-            path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
-            path.CloseFigure();
-            return path;
         }
 
         private async Task OnRegister()
@@ -296,43 +205,39 @@ namespace GameWikiApp.Forms.Auth
             btnRegister.Enabled = false;
             lblError.Visible = false;
 
-            var username = txtUsername.Text.Trim();
+            var user = txtUsername.Text.Trim();
             var email = txtEmail.Text.Trim();
-            var password = txtPassword.Text;
-            var confirm = txtConfirm.Text;
+            var pass = txtPassword.Text;
+            var conf = txtConfirm.Text;
 
-            // Validation
-            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(email) ||
-                string.IsNullOrEmpty(password) || string.IsNullOrEmpty(confirm))
+            if (string.IsNullOrEmpty(user) || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(pass) || string.IsNullOrEmpty(conf))
             {
                 ShowError("Please fill in all fields.");
                 btnRegister.Enabled = true;
                 return;
             }
 
-            if (password != confirm)
+            if (pass != conf)
             {
                 ShowError("Passwords do not match.");
                 btnRegister.Enabled = true;
                 return;
             }
 
-            var (success, error) = await _auth.RegisterAsync(username, email, password);
+            var (success, err) = await _auth.RegisterAsync(user, email, pass);
             btnRegister.Enabled = true;
 
             if (success)
             {
                 MessageBox.Show(
                     "✅  Account created successfully!\n\nYou can now sign in with your credentials.",
-                    "Welcome to GameWiki!",
+                    "Welcome to Nexoria!",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
                 Close();
             }
             else
-            {
-                ShowError(error ?? "Registration failed.");
-            }
+                ShowError(err ?? "Registration failed.");
         }
 
         private void ShowError(string message)

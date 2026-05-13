@@ -30,6 +30,23 @@ namespace GameWikiApp.Data
             return await conn.ExecuteScalarAsync<int>(sql, game);
         }
 
+        public async Task<bool> UpdateAsync(Game game)
+        {
+            using var conn = GetOpen();
+            var sql = @"UPDATE games SET title = @Title, slug = @Slug, short_description = @ShortDescription, full_description = @FullDescription, cover_image = @CoverImage, banner_image = @BannerImage
+                        WHERE game_id = @GameId";
+            var res = await conn.ExecuteAsync(sql, game);
+            return res > 0;
+        }
+
+        public async Task<bool> DeleteAsync(int id)
+        {
+            using var conn = GetOpen();
+            var sql = "DELETE FROM games WHERE game_id = @Id";
+            var res = await conn.ExecuteAsync(sql, new { Id = id });
+            return res > 0;
+        }
+
         private System.Data.IDbConnection GetOpen()
         {
             var c = DbConnection.GetConnection();

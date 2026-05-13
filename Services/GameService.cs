@@ -14,5 +14,9 @@ namespace GameWikiApp.Services
         public Task<IEnumerable<Game>> GetAllAsync() => _repo.GetAllAsync();
 
         public Task<int> CreateAsync(Game game) => _repo.CreateAsync(game);
+
+        public Task<bool> UpdateAsync(Game game) => _repo.UpdateAsync(game);
+
+        public Task<bool> DeleteAsync(int id) => _repo.DeleteAsync(id);
     }
 }

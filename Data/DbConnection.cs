@@ -9,5 +9,12 @@ namespace GameWikiApp.Data
         {
             return new MySqlConnection(GameWikiApp.Config.DatabaseConfig.ConnectionString);
         }
+
+        public static IDbConnection GetOpen()
+        {
+            var conn = GetConnection();
+            conn.Open();
+            return conn;
+        }
     }
 }
