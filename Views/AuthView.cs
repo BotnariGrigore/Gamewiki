@@ -31,35 +31,34 @@ public sealed class AuthView : UserControl
 
         var root = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("1.35*,1*"),
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
             Background = ThemePalette.BgPrimaryBrush
         };
 
         var brandPanel = BuildBrandPanel();
-        root.Children.Add(brandPanel);
-        Grid.SetColumn(brandPanel, 0);
 
         var formCard = new Border
         {
             Background = ThemePalette.BgSecondaryBrush,
             BorderBrush = ThemePalette.BorderLightBrush,
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(24),
-            Padding = new Thickness(28),
-            Margin = new Thickness(28),
-            VerticalAlignment = VerticalAlignment.Center,
+            CornerRadius = new CornerRadius(0),
+            Padding = new Thickness(24),
+            Margin = new Thickness(0),
+            VerticalAlignment = VerticalAlignment.Stretch,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
 
         var formStack = new StackPanel
         {
-            Spacing = 18
+            Spacing = 14,
+            VerticalAlignment = VerticalAlignment.Center
         };
 
         formStack.Children.Add(new TextBlock
         {
             Text = "Welcome back",
-            FontSize = 28,
+            FontSize = 22,
             FontWeight = FontWeight.Bold,
             Foreground = ThemePalette.TextPrimaryBrush
         });
@@ -67,7 +66,7 @@ public sealed class AuthView : UserControl
         formStack.Children.Add(new TextBlock
         {
             Text = "Sign in or create a community account to continue.",
-            FontSize = 13,
+            FontSize = 12,
             Foreground = ThemePalette.TextSecondaryBrush
         });
 
@@ -81,6 +80,12 @@ public sealed class AuthView : UserControl
         formStack.Children.Add(_tabs);
 
         formCard.Child = formStack;
+
+        brandPanel.VerticalAlignment = VerticalAlignment.Stretch;
+        brandPanel.Margin = new Thickness(0);
+        root.Children.Add(brandPanel);
+        Grid.SetColumn(brandPanel, 0);
+
         root.Children.Add(formCard);
         Grid.SetColumn(formCard, 1);
 
@@ -94,27 +99,29 @@ public sealed class AuthView : UserControl
         var border = new Border
         {
             Background = ThemePalette.SurfaceBrush,
-            Padding = new Thickness(56),
+            Padding = new Thickness(24),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
             Child = new StackPanel
             {
                 VerticalAlignment = VerticalAlignment.Center,
-                Spacing = 18,
+                Spacing = 14,
                 Children =
                 {
                     new TextBlock
                     {
                         Text = "Sign in to continue",
-                        FontSize = 38,
+                        FontSize = 28,
                         FontWeight = FontWeight.Bold,
                         Foreground = ThemePalette.TextPrimaryBrush
                     },
                     new TextBlock
                     {
                         Text = "Browse pages, manage games, organize genres, and moderate wiki categories from one place.",
-                        FontSize = 14,
+                        FontSize = 12,
                         Foreground = ThemePalette.TextSecondaryBrush,
                         TextWrapping = TextWrapping.Wrap,
-                        MaxWidth = 460
+                        MaxWidth = 300
                     },
                     new StackPanel
                     {
@@ -177,6 +184,19 @@ public sealed class AuthView : UserControl
         panel.Children.Add(_loginIdentifier);
         panel.Children.Add(Label("Password"));
         panel.Children.Add(_loginPassword);
+        var forgot = new TextBlock
+        {
+            Text = "Forgot password?",
+            FontSize = 12,
+            Foreground = ThemePalette.AccentBrush,
+            Margin = new Thickness(0, 4, 0, 0)
+        };
+        forgot.PointerPressed += (_, __) =>
+        {
+            _loginError.Foreground = ThemePalette.TextSecondaryBrush;
+            _loginError.Text = "Password reset is not implemented.";
+        };
+        panel.Children.Add(forgot);
         panel.Children.Add(button);
         panel.Children.Add(_loginError);
 
