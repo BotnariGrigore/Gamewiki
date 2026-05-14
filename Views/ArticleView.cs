@@ -28,7 +28,6 @@ public sealed class ArticleView : UserControl
 
     private readonly StackPanel _content = new();
     private readonly WrapPanel _galleryPanel = new();
-    private readonly WrapPanel _linkedPanel = new();
     private readonly WrapPanel _relatedPanel = new();
     private readonly StackPanel _commentsPanel = new();
     private readonly TextBox _commentBox = new();
@@ -41,6 +40,7 @@ public sealed class ArticleView : UserControl
     private readonly TextBlock _gameChip = new();
     private readonly Border _cover = new();
     private readonly TextBlock _contentText = new();
+    private readonly StackPanel _contentPanel = new();
 
     private WikiArticle? _article;
     private bool _isLiked;
@@ -64,7 +64,6 @@ public sealed class ArticleView : UserControl
         _content.Children.Add(BuildHero());
         _content.Children.Add(BuildContentCard());
         _content.Children.Add(BuildGallerySection());
-        _content.Children.Add(BuildLinkedSection());
         _content.Children.Add(BuildRelatedSection());
         _content.Children.Add(BuildCommentsSection());
 
@@ -179,11 +178,109 @@ public sealed class ArticleView : UserControl
             Padding = new Thickness(22)
         };
 
-        _contentText.TextWrapping = TextWrapping.Wrap;
-        _contentText.Foreground = ThemePalette.TextPrimaryBrush;
-        _contentText.FontSize = 13;
-        shell.Child = _contentText;
+        _contentPanel.Spacing = 0;
+        shell.Child = _contentPanel;
         return shell;
+    }
+
+    private void BuildContentWithLinks(string content, IEnumerable<ArticleLink> links)
+    {
+        _contentPanel.Children.Clear();
+
+        var linkMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var link in links)
+        {
+            var key = (link.LinkText ?? link.TargetTitle ?? string.Empty).Trim();
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                linkMap[key] = link.ToArticleId;
+            }
+        }
+
+        var regex = new System.Text.RegularExpressions.Regex(
+            @"\[\[([^\]]+)\]\]",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        var lastIndex = 0;
+        var matchCollection = regex.Matches(content);
+
+        foreach (System.Text.RegularExpressions.Match match in matchCollection)
+        {
+            if (match.Index > lastIndex)
+            {
+                var textSegment = content[lastIndex..match.Index];
+                _contentPanel.Children.Add(new TextBlock
+                {
+                    Text = textSegment,
+                    TextWrapping = TextWrapping.Wrap,
+                    Foreground = ThemePalette.TextPrimaryBrush,
+                    FontSize = 13
+                });
+            }
+
+            var linkText = match.Groups[1].Value.Trim();
+            lastIndex = match.Index + match.Length;
+
+            if (string.IsNullOrWhiteSpace(linkText))
+            {
+                continue;
+            }
+
+            var linkBlock = new TextBlock
+            {
+                Text = linkText,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = ThemePalette.AccentBrush,
+                FontSize = 13,
+                Cursor = new Cursor(StandardCursorType.Hand),
+                TextDecorations = TextDecorations.Underline
+            };
+
+            if (linkMap.TryGetValue(linkText, out var targetId))
+            {
+                var capturedId = targetId;
+                linkBlock.PointerPressed += (_, __) => _openArticle(capturedId);
+                ToolTip.SetTip(linkBlock, "Open linked article");
+            }
+            else
+            {
+                linkBlock.Foreground = ThemePalette.TextMutedBrush;
+                linkBlock.Cursor = new Cursor(StandardCursorType.Arrow);
+                linkBlock.TextDecorations = null;
+            }
+
+            _contentPanel.Children.Add(new Border
+            {
+                Child = linkBlock,
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0),
+                Margin = new Thickness(0)
+            });
+        }
+
+        if (lastIndex < content.Length)
+        {
+            var remaining = content[lastIndex..];
+            _contentPanel.Children.Add(new TextBlock
+            {
+                Text = remaining,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = ThemePalette.TextPrimaryBrush,
+                FontSize = 13
+            });
+        }
+
+        if (_contentPanel.Children.Count == 0)
+        {
+            _contentPanel.Children.Add(new TextBlock
+            {
+                Text = content,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = ThemePalette.TextPrimaryBrush,
+                FontSize = 13
+            });
+        }
     }
 
     private Control BuildGallerySection()
@@ -201,24 +298,6 @@ public sealed class ArticleView : UserControl
 
         _galleryPanel.Orientation = Orientation.Horizontal;
         stack.Children.Add(_galleryPanel);
-
-        shell.Child = stack;
-        return shell;
-    }
-
-    private Control BuildLinkedSection()
-    {
-        var shell = UiFactory.CreateCard();
-        shell.Background = ThemePalette.BgSecondaryBrush;
-
-        var stack = new StackPanel
-        {
-            Spacing = 12
-        };
-        stack.Children.Add(SectionTitle("Linked articles"));
-
-        _linkedPanel.Orientation = Orientation.Horizontal;
-        stack.Children.Add(_linkedPanel);
 
         shell.Child = stack;
         return shell;
@@ -308,29 +387,11 @@ public sealed class ArticleView : UserControl
             _editButton.IsVisible = false;
             UpdateActionButtons();
             _galleryPanel.Children.Clear();
-            _linkedPanel.Children.Clear();
             _relatedPanel.Children.Clear();
             _commentsPanel.Children.Clear();
-            _galleryPanel.Children.Add(new TextBlock
-            {
-                Text = "No gallery images.",
-                Foreground = ThemePalette.TextMutedBrush
-            });
-            _linkedPanel.Children.Add(new TextBlock
-            {
-                Text = "No linked articles.",
-                Foreground = ThemePalette.TextMutedBrush
-            });
-            _relatedPanel.Children.Add(new TextBlock
-            {
-                Text = "No related articles.",
-                Foreground = ThemePalette.TextMutedBrush
-            });
-            _commentsPanel.Children.Add(new TextBlock
-            {
-                Text = "No comments yet.",
-                Foreground = ThemePalette.TextMutedBrush
-            });
+            _galleryPanel.Children.Add(new TextBlock { Text = "No gallery images.", Foreground = ThemePalette.TextMutedBrush });
+            _relatedPanel.Children.Add(new TextBlock { Text = "No related articles.", Foreground = ThemePalette.TextMutedBrush });
+            _commentsPanel.Children.Add(new TextBlock { Text = "No comments yet.", Foreground = ThemePalette.TextMutedBrush });
             return;
         }
 
@@ -349,7 +410,6 @@ public sealed class ArticleView : UserControl
             _editButton.IsVisible = false;
             UpdateActionButtons();
             _galleryPanel.Children.Clear();
-            _linkedPanel.Children.Clear();
             _relatedPanel.Children.Clear();
             _commentsPanel.Children.Clear();
             return;
@@ -359,7 +419,9 @@ public sealed class ArticleView : UserControl
         _gameChip.Text = _article.GameTitle ?? "Unknown game";
         _meta.Text = $"By {_article.AuthorUsername ?? "Unknown"} | Updated {_article.UpdatedAt:g}";
         _counts.Text = $"{_article.ViewsCount} views | {_article.LikeCount} likes | {_article.CommentCount} comments";
-        _contentText.Text = _article.Content;
+
+        var articleLinks = (await _articles.GetLinkedArticlesAsync(_articleId)).ToList();
+        BuildContentWithLinks(_article.Content, articleLinks);
 
         var bitmap = await ImageLoader.LoadAsync(_article.CoverImage);
         _cover.Child = BuildCoverContent(bitmap, _article.Title);
@@ -380,7 +442,6 @@ public sealed class ArticleView : UserControl
 
         UpdateActionButtons();
         await LoadGalleryAsync();
-        await LoadLinkedArticlesAsync();
         await LoadRelatedArticlesAsync();
         await LoadCommentsAsync();
     }
@@ -432,11 +493,7 @@ public sealed class ArticleView : UserControl
         var list = (await _images.GetByArticleIdAsync(_articleId)).ToList();
         if (list.Count == 0)
         {
-            _galleryPanel.Children.Add(new TextBlock
-            {
-                Text = "No gallery images.",
-                Foreground = ThemePalette.TextMutedBrush
-            });
+            _galleryPanel.Children.Add(new TextBlock { Text = "No gallery images.", Foreground = ThemePalette.TextMutedBrush });
             return;
         }
 
@@ -483,28 +540,6 @@ public sealed class ArticleView : UserControl
         };
     }
 
-    private async Task LoadLinkedArticlesAsync()
-    {
-        _linkedPanel.Children.Clear();
-        var list = (await _articles.GetLinkedArticlesAsync(_articleId)).ToList();
-        if (list.Count == 0)
-        {
-            _linkedPanel.Children.Add(new TextBlock
-            {
-                Text = "No linked articles.",
-                Foreground = ThemePalette.TextMutedBrush
-            });
-            return;
-        }
-
-        foreach (var link in list)
-        {
-            var button = UiFactory.CreateSubtleButton(string.IsNullOrWhiteSpace(link.LinkText) ? link.TargetTitle ?? "Open" : link.LinkText, double.NaN);
-            button.Click += (_, __) => _openArticle(link.ToArticleId);
-            _linkedPanel.Children.Add(button);
-        }
-    }
-
     private async Task LoadRelatedArticlesAsync()
     {
         _relatedPanel.Children.Clear();
@@ -516,11 +551,7 @@ public sealed class ArticleView : UserControl
         var list = (await _articles.GetRelatedAsync(_articleId, _article.GameId, 8)).ToList();
         if (list.Count == 0)
         {
-            _relatedPanel.Children.Add(new TextBlock
-            {
-                Text = "No related articles.",
-                Foreground = ThemePalette.TextMutedBrush
-            });
+            _relatedPanel.Children.Add(new TextBlock { Text = "No related articles.", Foreground = ThemePalette.TextMutedBrush });
             return;
         }
 
@@ -583,11 +614,7 @@ public sealed class ArticleView : UserControl
         var list = (await _comments.GetByArticleIdAsync(_articleId)).ToList();
         if (list.Count == 0)
         {
-            _commentsPanel.Children.Add(new TextBlock
-            {
-                Text = "No comments yet.",
-                Foreground = ThemePalette.TextMutedBrush
-            });
+            _commentsPanel.Children.Add(new TextBlock { Text = "No comments yet.", Foreground = ThemePalette.TextMutedBrush });
             return;
         }
 

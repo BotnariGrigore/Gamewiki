@@ -67,7 +67,7 @@ public sealed class ArticleEditorWindow : Window
         _summaryBox.AcceptsReturn = true;
         _summaryBox.TextWrapping = TextWrapping.Wrap;
         _summaryBox.Height = 84;
-        _contentBox = UiFactory.CreateTextBox("Article content", 820);
+        _contentBox = UiFactory.CreateTextBox("Article content — use [[Article Title]] to create inline wiki links", 820);
         _contentBox.AcceptsReturn = true;
         _contentBox.TextWrapping = TextWrapping.Wrap;
         _contentBox.Height = 260;
@@ -510,6 +510,7 @@ public sealed class ArticleEditorWindow : Window
                 article.ArticleId = id;
                 await _articles.SetCategoriesAsync(id, categoryIds);
                 await _images.ReplaceAsync(id, AppState.CurrentUser.UserId, ParseGalleryUrls());
+                await SaveWikiLinksAsync(article.ArticleId, selectedGame.GameId, content);
                 Close(true);
                 return;
             }
@@ -523,12 +524,53 @@ public sealed class ArticleEditorWindow : Window
             {
                 await _articles.SetCategoriesAsync(_articleId, categoryIds);
                 await _images.ReplaceAsync(_articleId, AppState.CurrentUser.UserId, ParseGalleryUrls());
+                await SaveWikiLinksAsync(_articleId, selectedGame.GameId, content);
                 Close(true);
                 return;
             }
 
             await DialogHelper.ShowAsync(this, "Save failed", "The article could not be updated. Please try again.");
         }
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex WikiLinkPattern =
+        new(@"\[\[([^\]]+)\]\]", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private async Task SaveWikiLinksAsync(int articleId, int gameId, string content)
+    {
+        var matchCollection = WikiLinkPattern.Matches(content);
+        if (matchCollection.Count == 0)
+        {
+            await _articles.ReplaceLinksAsync(articleId, Enumerable.Empty<(int, string)>());
+            return;
+        }
+
+        var allMatches = matchCollection.Cast<System.Text.RegularExpressions.Match>().ToList();
+
+        var linkTitles = allMatches
+            .Select(m => m.Groups[1].Value.Trim())
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var resolved = await _articles.ResolveTitlesToIdsAsync(gameId, linkTitles);
+
+        var links = new List<(int ToArticleId, string LinkText)>();
+        foreach (var match in allMatches)
+        {
+            var linkText = match.Groups[1].Value.Trim();
+            if (string.IsNullOrWhiteSpace(linkText))
+            {
+                continue;
+            }
+
+            if (resolved.TryGetValue(linkText, out var toArticleId))
+            {
+                links.Add((toArticleId, linkText));
+            }
+        }
+
+        await _articles.ReplaceLinksAsync(articleId, links);
     }
 
     private IEnumerable<string> ParseGalleryUrls()

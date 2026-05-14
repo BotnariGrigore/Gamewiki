@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
 using GameWikiApp.Helpers;
@@ -185,6 +187,77 @@ WHERE article_id = @ArticleId";
             using var conn = DbConnection.GetOpen();
             var rows = await conn.ExecuteAsync("UPDATE wiki_articles SET views_count = views_count + 1 WHERE article_id = @Id", new { Id = articleId });
             return rows > 0;
+        }
+
+        public async Task<Dictionary<string, int>> ResolveTitlesToIdsAsync(int gameId, IEnumerable<string> titles)
+        {
+            using var conn = DbConnection.GetOpen();
+            var titleList = titles.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (titleList.Count == 0)
+            {
+                return new Dictionary<string, int>();
+            }
+
+            var placeholders = string.Join(",", titleList.Select((_, i) => $"@t{i}"));
+            var parameters = new DynamicParameters();
+            for (var i = 0; i < titleList.Count; i++)
+            {
+                parameters.Add($"@t{i}", titleList[i]);
+            }
+
+            parameters.Add("@GameId", gameId);
+
+            var sql = $@"
+SELECT title, article_id
+FROM wiki_articles
+WHERE game_id = @GameId
+  AND title IN ({placeholders})
+  AND is_published = 1";
+
+            var rows = (await conn.QueryAsync<(string Title, int ArticleId)>(sql, parameters)).ToList();
+
+            var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in rows)
+            {
+                result[row.Title] = row.ArticleId;
+            }
+
+            return result;
+        }
+
+        public async Task<bool> ReplaceLinksAsync(int fromArticleId, IEnumerable<(int ToArticleId, string LinkText)> links)
+        {
+            using var conn = DbConnection.GetOpen();
+            using var tran = conn.BeginTransaction();
+            try
+            {
+                await conn.ExecuteAsync(
+                    "DELETE FROM article_links WHERE from_article_id = @FromArticleId",
+                    new { FromArticleId = fromArticleId },
+                    tran);
+
+                foreach (var link in links)
+                {
+                    if (string.IsNullOrWhiteSpace(link.LinkText))
+                    {
+                        continue;
+                    }
+
+                    await conn.ExecuteAsync(
+                        @"INSERT INTO article_links (from_article_id, to_article_id, link_text)
+                          VALUES (@FromArticleId, @ToArticleId, @LinkText)",
+                        new { FromArticleId = fromArticleId, ToArticleId = link.ToArticleId, LinkText = link.LinkText.Trim() },
+                        tran);
+                }
+
+                tran.Commit();
+                return true;
+            }
+            catch
+            {
+                tran.Rollback();
+                return false;
+            }
         }
 
         public async Task<IEnumerable<int>> GetCategoryIdsByArticleIdAsync(int articleId)
