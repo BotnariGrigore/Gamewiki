@@ -28,7 +28,9 @@ namespace GameWikiApp.Services
                 {
                     Username = username,
                     Email = email,
-                    PasswordHash = hash
+                    PasswordHash = hash,
+                    ThemePreference = "light",
+                    RoleId = 2
                 };
                 var id = await _users.CreateAsync(user);
                 return id > 0 ? (true, null) : (false, "Database error while creating user.");
@@ -69,6 +71,7 @@ namespace GameWikiApp.Services
                     user.IsOnline = true;
                     user.LastSeen = DateTime.UtcNow;
                     await _users.UpdateAsync(user);
+                    await EnsureBootstrapAdminAsync(user);
                 }
                 catch { }
 
@@ -78,6 +81,21 @@ namespace GameWikiApp.Services
             {
                 try { File.AppendAllText("auth_errors.log", DateTime.UtcNow + " AUTH ERROR: " + ex + Environment.NewLine); } catch {}
                 return (null, "An unexpected error occurred. Please try again.");
+            }
+        }
+
+        private async Task EnsureBootstrapAdminAsync(Models.User user)
+        {
+            var adminCount = await _users.GetAdminCountAsync();
+            if (adminCount > 0)
+            {
+                return;
+            }
+
+            if (await _users.UpdateRoleAsync(user.UserId, 1))
+            {
+                user.RoleId = 1;
+                user.RoleName = "admin";
             }
         }
 

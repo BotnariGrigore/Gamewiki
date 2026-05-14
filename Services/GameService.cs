@@ -10,13 +10,11 @@ namespace GameWikiApp.Services
         private readonly GameRepository _repo = new();
 
         public Task<Game?> GetByIdAsync(int id) => _repo.GetByIdAsync(id);
-
         public Task<IEnumerable<Game>> GetAllAsync() => _repo.GetAllAsync();
-
+        public Task<IEnumerable<Game>> GetPopularAsync(int limit = 10) => _repo.GetPopularAsync(limit);
+        public Task<IEnumerable<Game>> SearchAsync(string query) => _repo.SearchAsync(query);
         public Task<int> CreateAsync(Game game) => _repo.CreateAsync(game);
-
         public Task<bool> UpdateAsync(Game game) => _repo.UpdateAsync(game);
-
         public Task<bool> DeleteAsync(int id) => _repo.DeleteAsync(id);
     }
 }

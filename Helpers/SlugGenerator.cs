@@ -8,14 +8,17 @@ namespace GameWikiApp.Helpers
     {
         public static string Generate(string? text)
         {
-            if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Empty;
+            }
 
             var normalized = text.Normalize(NormalizationForm.FormD);
             var sb = new StringBuilder();
             foreach (var c in normalized)
             {
-                var uc = CharUnicodeInfo.GetUnicodeCategory(c);
-                if (uc != UnicodeCategory.NonSpacingMark)
+                var category = CharUnicodeInfo.GetUnicodeCategory(c);
+                if (category != UnicodeCategory.NonSpacingMark)
                 {
                     sb.Append(c);
                 }

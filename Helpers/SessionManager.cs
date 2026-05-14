@@ -1,3 +1,4 @@
+using System;
 using GameWikiApp.Models;
 
 namespace GameWikiApp.Helpers
@@ -13,13 +14,29 @@ namespace GameWikiApp.Helpers
             CurrentUser = user;
             Token = token;
             PreferredTheme = preferredTheme ?? "dark";
-            // Enable simplified UI after login so controls behave in a more standard way.
+            ThemeHelper.CurrentTheme = string.Equals(PreferredTheme, "light", StringComparison.OrdinalIgnoreCase)
+                ? ThemeHelper.ThemeMode.Light
+                : ThemeHelper.ThemeMode.Dark;
             ThemeHelper.SimplifiedUI = true;
         }
 
         public static void SetPreferredTheme(string theme)
         {
             PreferredTheme = theme ?? "dark";
+            if (CurrentUser != null)
+            {
+                CurrentUser.ThemePreference = PreferredTheme;
+            }
+        }
+
+        public static bool IsAdmin => CurrentUser?.RoleId == 1;
+
+        public static void ApplyThemePreference(string? theme)
+        {
+            SetPreferredTheme(theme ?? "dark");
+            ThemeHelper.CurrentTheme = string.Equals(PreferredTheme, "light", StringComparison.OrdinalIgnoreCase)
+                ? ThemeHelper.ThemeMode.Light
+                : ThemeHelper.ThemeMode.Dark;
         }
 
         public static void EndSession()
@@ -29,6 +46,7 @@ namespace GameWikiApp.Helpers
             PreferredTheme = "dark";
             // Restore visuals for auth screens / next session
             ThemeHelper.SimplifiedUI = false;
+            ThemeHelper.CurrentTheme = ThemeHelper.ThemeMode.Dark;
         }
 
         public static bool IsAuthenticated => CurrentUser != null;
