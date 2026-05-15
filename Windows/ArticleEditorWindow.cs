@@ -71,8 +71,8 @@ public sealed class ArticleEditorWindow : Window
         _contentBox.AcceptsReturn = true;
         _contentBox.TextWrapping = TextWrapping.Wrap;
         _contentBox.Height = 260;
-        _coverBox = UiFactory.CreateTextBox("Cover image url or path", 400);
-        _galleryBox = UiFactory.CreateTextBox("Gallery image urls, one per line", 400);
+        _coverBox = UiFactory.CreateTextBox("Cover image url or path");
+        _galleryBox = UiFactory.CreateTextBox("Gallery image urls, one per line");
         _galleryBox.AcceptsReturn = true;
         _galleryBox.TextWrapping = TextWrapping.Wrap;
         _galleryBox.Height = 120;
@@ -130,14 +130,14 @@ public sealed class ArticleEditorWindow : Window
             Spacing = 10
         };
 
-        var save = UiFactory.CreatePrimaryButton("Save", 120);
+        var save = UiFactory.CreatePrimaryButton("Save", 120, "✓");
         save.Click += async (_, __) => await SaveAsync();
         footer.Children.Add(save);
 
         _deleteButton.Click += async (_, __) => await DeleteAsync();
         footer.Children.Add(_deleteButton);
 
-        var close = UiFactory.CreateSubtleButton("Close", 120);
+        var close = UiFactory.CreateSubtleButton("Close", 120, "×");
         close.Click += (_, __) => Close(false);
         footer.Children.Add(close);
 
@@ -207,7 +207,7 @@ public sealed class ArticleEditorWindow : Window
         };
 
         row.Children.Add(editor);
-        var browse = UiFactory.CreateSubtleButton("Browse...", 80);
+        var browse = UiFactory.CreateSubtleButton("Browse...", 80, "↑");
         browse.Height = 42;
         browse.Click += async (_, __) =>
         {
@@ -270,9 +270,9 @@ public sealed class ArticleEditorWindow : Window
         };
 
         row.Children.Add(_galleryBox);
-        var browse = UiFactory.CreateSubtleButton("Browse...", 80);
-        browse.Height = 120;
-        browse.VerticalAlignment = VerticalAlignment.Stretch;
+        var browse = UiFactory.CreateSubtleButton("Browse...", 80, "↑");
+        browse.Height = 42;
+        browse.VerticalAlignment = VerticalAlignment.Center;
         browse.Click += async (_, __) =>
         {
             var topLevel = TopLevel.GetTopLevel(_galleryBox);
@@ -327,6 +327,12 @@ public sealed class ArticleEditorWindow : Window
     {
         try
         {
+            var validation = await ImageValidation.ValidateLocalImageAsync(sourcePath);
+            if (!validation.Success)
+            {
+                return null;
+            }
+
             var photoDir = Path.Combine(AppContext.BaseDirectory, "Photo");
             Directory.CreateDirectory(photoDir);
 
@@ -520,7 +526,7 @@ public sealed class ArticleEditorWindow : Window
         else
         {
             article.ArticleId = _articleId;
-            if (await _articles.UpdateAsync(article))
+            if (await _articles.UpdateAsync(article, AppState.CurrentUser.UserId))
             {
                 await _articles.SetCategoriesAsync(_articleId, categoryIds);
                 await _images.ReplaceAsync(_articleId, AppState.CurrentUser.UserId, ParseGalleryUrls());

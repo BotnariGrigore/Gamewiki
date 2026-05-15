@@ -95,10 +95,12 @@ public sealed class DashboardView : UserControl
         _statsText.Foreground = ThemePalette.TextSecondaryBrush;
         stack.Children.Add(_statsText);
 
-        var stats = new StackPanel
+        var stats = new WrapPanel
         {
             Orientation = Orientation.Horizontal,
-            Spacing = 12
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            ItemWidth = 180,
+            Margin = new Thickness(0, 2, 0, 0)
         };
         stats.Children.Add(CreateStatTile("Users", _usersCount));
         stats.Children.Add(CreateStatTile("Games", _gamesCount));
@@ -168,20 +170,22 @@ public sealed class DashboardView : UserControl
             Spacing = 12
         };
 
-        var headerRow = new StackPanel
+        var headerRow = new Grid
         {
-            Orientation = Orientation.Horizontal,
-            Spacing = 10
+            ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"),
+            ColumnSpacing = 10
         };
         headerRow.Children.Add(CreateSectionHeader("Games", "Wiki page management"));
 
-        var addButton = UiFactory.CreatePrimaryButton("Add game", 110);
+        var addButton = UiFactory.CreatePrimaryButton("Add game", 110, "＋");
         addButton.Click += async (_, __) => await OpenGameEditorAsync(0);
         headerRow.Children.Add(addButton);
+        Grid.SetColumn(addButton, 1);
 
-        var refreshButton = UiFactory.CreateSubtleButton("Refresh", 90);
+        var refreshButton = UiFactory.CreateSubtleButton("Refresh", 90, "↻");
         refreshButton.Click += async (_, __) => await LoadGamesAsync();
         headerRow.Children.Add(refreshButton);
+        Grid.SetColumn(refreshButton, 2);
 
         stack.Children.Add(headerRow);
 
@@ -204,21 +208,23 @@ public sealed class DashboardView : UserControl
 
         stack.Children.Add(CreateSectionHeader("Genres", "Global tags used to group games"));
 
-        var editor = new StackPanel
+        var editor = new Grid
         {
-            Orientation = Orientation.Horizontal,
-            Spacing = 10
+            ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"),
+            ColumnSpacing = 10
         };
 
         editor.Children.Add(_genreNameBox);
 
-        var addButton = UiFactory.CreatePrimaryButton("Add genre", 110);
+        var addButton = UiFactory.CreatePrimaryButton("Add genre", 110, "＋");
         addButton.Click += async (_, __) => await AddGenreAsync();
         editor.Children.Add(addButton);
+        Grid.SetColumn(addButton, 1);
 
-        var refreshButton = UiFactory.CreateSubtleButton("Refresh", 90);
+        var refreshButton = UiFactory.CreateSubtleButton("Refresh", 90, "↻");
         refreshButton.Click += async (_, __) => await LoadGenresAsync();
         editor.Children.Add(refreshButton);
+        Grid.SetColumn(refreshButton, 2);
 
         stack.Children.Add(editor);
 
@@ -263,7 +269,7 @@ public sealed class DashboardView : UserControl
         editor.Children.Add(_categoryDescriptionBox);
         Grid.SetColumn(_categoryDescriptionBox, 2);
 
-        var saveButton = UiFactory.CreatePrimaryButton("Save", 90);
+        var saveButton = UiFactory.CreatePrimaryButton("Save", 90, "✓");
         saveButton.Click += async (_, __) => await SaveCategoryAsync();
         editor.Children.Add(saveButton);
         Grid.SetColumn(saveButton, 3);
@@ -463,12 +469,12 @@ public sealed class DashboardView : UserControl
         grid.Children.Add(BuildUserBadge(user.RoleName ?? (user.RoleId == 1 ? "admin" : "user")));
         Grid.SetColumn(grid.Children[1], 1);
 
-        var toggleRole = UiFactory.CreateSubtleButton(user.RoleId == 1 ? "Make user" : "Make admin", 110);
+        var toggleRole = UiFactory.CreateSubtleButton(user.RoleId == 1 ? "Make user" : "Make admin", 110, "⇄");
         toggleRole.Click += async (_, __) => await ToggleRoleAsync(user);
         grid.Children.Add(toggleRole);
         Grid.SetColumn(toggleRole, 2);
 
-        var delete = UiFactory.CreatePrimaryButton("Delete", 90);
+        var delete = UiFactory.CreatePrimaryButton("Delete", 90, "✕");
         delete.Click += async (_, __) => await DeleteUserAsync(user);
         grid.Children.Add(delete);
         Grid.SetColumn(delete, 3);
@@ -561,12 +567,12 @@ public sealed class DashboardView : UserControl
         });
         grid.Children.Add(info);
 
-        var edit = UiFactory.CreateSubtleButton("Edit", 90);
+        var edit = UiFactory.CreateSubtleButton("Edit", 90, "✎");
         edit.Click += async (_, __) => await OpenGameEditorAsync(game.GameId);
         grid.Children.Add(edit);
         Grid.SetColumn(edit, 1);
 
-        var delete = UiFactory.CreatePrimaryButton("Delete", 90);
+        var delete = UiFactory.CreatePrimaryButton("Delete", 90, "✕");
         delete.Click += async (_, __) => await DeleteGameAsync(game);
         grid.Children.Add(delete);
         Grid.SetColumn(delete, 2);
@@ -611,7 +617,7 @@ public sealed class DashboardView : UserControl
         });
         grid.Children.Add(info);
 
-        var delete = UiFactory.CreatePrimaryButton("Delete", 90);
+        var delete = UiFactory.CreatePrimaryButton("Delete", 90, "✕");
         delete.Click += async (_, __) => await DeleteGenreAsync(genre);
         grid.Children.Add(delete);
         Grid.SetColumn(delete, 1);
@@ -666,12 +672,12 @@ public sealed class DashboardView : UserControl
         }
         grid.Children.Add(info);
 
-        var edit = UiFactory.CreateSubtleButton("Edit", 90);
+        var edit = UiFactory.CreateSubtleButton("Edit", 90, "✎");
         edit.Click += (_, __) => FillCategoryEditor(category);
         grid.Children.Add(edit);
         Grid.SetColumn(edit, 1);
 
-        var delete = UiFactory.CreatePrimaryButton("Delete", 90);
+        var delete = UiFactory.CreatePrimaryButton("Delete", 90, "✕");
         delete.Click += async (_, __) => await DeleteCategoryAsync(category);
         grid.Children.Add(delete);
         Grid.SetColumn(delete, 2);

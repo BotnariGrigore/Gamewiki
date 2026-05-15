@@ -8,6 +8,8 @@ namespace GameWikiApp;
 
 public static class AppState
 {
+    public static event Action? ThemeChanged;
+
     public static User? CurrentUser { get; private set; }
     public static string? Token { get; private set; }
     public static string PreferredTheme { get; private set; } = "light";
@@ -21,6 +23,7 @@ public static class AppState
         CurrentUser = user;
         Token = token;
         PreferredTheme = string.IsNullOrWhiteSpace(preferredTheme) ? "light" : preferredTheme.Trim();
+        ThemePalette.ApplyTheme(IsDark);
         ApplyThemeVariant();
         // Persist local copy of preference
         SaveLocalThemePreference();
@@ -34,7 +37,9 @@ public static class AppState
             CurrentUser.ThemePreference = PreferredTheme;
         }
 
+        ThemePalette.ApplyTheme(IsDark);
         ApplyThemeVariant();
+        ThemeChanged?.Invoke();
         // Save local preference as well so unauthenticated users keep their choice
         SaveLocalThemePreference();
     }
@@ -43,7 +48,7 @@ public static class AppState
     {
         CurrentUser = null;
         Token = null;
-        PreferredTheme = "light";
+        ThemePalette.ApplyTheme(IsDark);
         ApplyThemeVariant();
     }
 
@@ -61,6 +66,8 @@ public static class AppState
                     PreferredTheme = t;
                 }
             }
+
+            ThemePalette.ApplyTheme(IsDark);
         }
         catch
         {

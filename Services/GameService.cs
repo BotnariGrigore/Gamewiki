@@ -14,6 +14,7 @@ namespace GameWikiApp.Services
         public Task<IEnumerable<Game>> GetPopularAsync(int limit = 10) => _repo.GetPopularAsync(limit);
         public Task<IEnumerable<Game>> SearchAsync(string query) => _repo.SearchAsync(query);
         public Task<int> CreateAsync(Game game) => _repo.CreateAsync(game);
+        public Task<bool> TrackViewOnceAsync(int gameId, int userId) => _repo.TrackViewOnceAsync(gameId, userId);
         public Task<bool> UpdateAsync(Game game) => _repo.UpdateAsync(game);
         public Task<bool> DeleteAsync(int id) => _repo.DeleteAsync(id);
     }

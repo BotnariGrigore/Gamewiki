@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -51,20 +51,20 @@ public sealed class HomeView : UserControl
             Background = ThemePalette.BgPrimaryBrush
         };
 
-        _content.Spacing = 14;
-        _content.Margin = new Thickness(0);
+        _content.Spacing = 30;
+        _content.Margin = new Thickness(24, 0, 24, 28);
         _content.Children.Add(BuildHeroShell());
 
         // Genre section
-        _genreSection.Spacing = 12;
+        _genreSection.Spacing = 18;
         _content.Children.Add(_genreSection);
 
         // Game section
-        _gameSection.Spacing = 12;
+        _gameSection.Spacing = 18;
         _content.Children.Add(_gameSection);
 
         // Article section
-        _articleSection.Spacing = 12;
+        _articleSection.Spacing = 18;
         _content.Children.Add(_articleSection);
 
         _genrePanel.Orientation = Orientation.Horizontal;
@@ -72,21 +72,21 @@ public sealed class HomeView : UserControl
         _genrePanel.ItemHeight = 60;
         _genrePanel.HorizontalAlignment = HorizontalAlignment.Stretch;
         _genrePanel.VerticalAlignment = VerticalAlignment.Top;
-        _genrePanel.Margin = new Thickness(0, 0, 0, 16);
+        _genrePanel.Margin = new Thickness(0, 0, 0, 24);
 
         _gamesPanel.Orientation = Orientation.Horizontal;
-        _gamesPanel.ItemWidth = 260; // Original width
-        _gamesPanel.ItemHeight = 300; // Updated height
-        _gamesPanel.HorizontalAlignment = HorizontalAlignment.Stretch; // Original alignment
+        _gamesPanel.ItemWidth = 260;
+        _gamesPanel.ItemHeight = 300;
+        _gamesPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
         _gamesPanel.VerticalAlignment = VerticalAlignment.Top;
-        _gamesPanel.Margin = new Thickness(0, 0, 0, 16);
+        _gamesPanel.Margin = new Thickness(0, 0, 0, 24);
 
         _articlesPanel.Orientation = Orientation.Horizontal;
         _articlesPanel.ItemWidth = 260;
-        _articlesPanel.ItemHeight = 180;
+        _articlesPanel.ItemHeight = 200;
         _articlesPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
         _articlesPanel.VerticalAlignment = VerticalAlignment.Top;
-        _articlesPanel.Margin = new Thickness(0, 0, 0, 24);
+        _articlesPanel.Margin = new Thickness(0, 0, 0, 28);
 
         Content = scroll;
     }
@@ -150,7 +150,7 @@ public sealed class HomeView : UserControl
         else
         {
             _heroTitle.Text = "Nexoria";
-            _heroSubtitle.Text = "Browse games by genre or discover trending articles.";
+            _heroSubtitle.Text = "Browse popular games by genre or discover trending articles.";
             _heroTag.Text = "NEXORIA";
         }
         _gamesStatValue.Text = games.Count.ToString();
@@ -159,8 +159,7 @@ public sealed class HomeView : UserControl
         // Genre chips
         _genreSection.Children.Clear();
         _genreSection.Children.Add(UiFactory.CreateSectionHeader(
-            string.IsNullOrWhiteSpace(_selectedGenre) ? "Browse by Genre" : $"Genre: {_selectedGenre}",
-            $"{genres.Count} genres"));
+            string.IsNullOrWhiteSpace(_selectedGenre) ? "Browse by Genre" : $"Genre: {_selectedGenre}"));
         _genrePanel.Children.Clear();
         if (genres.Count == 0)
         {
@@ -179,7 +178,10 @@ public sealed class HomeView : UserControl
 
         // Games
         _gameSection.Children.Clear();
-        _gameSection.Children.Add(UiFactory.CreateSectionHeader("Games", "Click a genre above to filter"));
+        var gameSectionTitle = string.IsNullOrWhiteSpace(search) && string.IsNullOrWhiteSpace(selectedGenre)
+            ? "Popular Games"
+            : "Games";
+        _gameSection.Children.Add(UiFactory.CreateSectionHeader(gameSectionTitle));
         _gamesPanel.Children.Clear();
         if (games.Count == 0)
         {
@@ -196,7 +198,7 @@ public sealed class HomeView : UserControl
 
         // Articles
         _articleSection.Children.Clear();
-        _articleSection.Children.Add(UiFactory.CreateSectionHeader("Trending Articles", "Most viewed community pages"));
+        _articleSection.Children.Add(UiFactory.CreateSectionHeader("Trending Articles"));
         _articlesPanel.Children.Clear();
         if (articles.Count == 0)
         {
@@ -292,7 +294,7 @@ public sealed class HomeView : UserControl
         _heroTitle.FontWeight = FontWeight.Bold;
         _heroTitle.Foreground = ThemePalette.TextPrimaryBrush;
 
-        _heroSubtitle.Text = "Browse games by genre or discover trending articles.";
+        _heroSubtitle.Text = "Browse popular games by genre or discover trending articles.";
         _heroSubtitle.FontSize = 13;
         _heroSubtitle.Foreground = ThemePalette.TextSecondaryBrush;
         _heroSubtitle.TextWrapping = TextWrapping.Wrap;
@@ -390,12 +392,10 @@ public sealed class HomeView : UserControl
             BorderBrush = ThemePalette.BorderLightBrush,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(18),
-            Width = 260, // Original width
-            Height = 300, // Updated height
-            Margin = new Thickness(12),
-            Padding = new Thickness(12),
-            Cursor = new Cursor(StandardCursorType.Hand),
-            RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative)
+            Width = 260,
+            Height = 300,
+            Margin = new Thickness(10),
+            Cursor = new Cursor(StandardCursorType.Hand)
         };
 
         var stack = new StackPanel
@@ -403,8 +403,8 @@ public sealed class HomeView : UserControl
             Spacing = 8
         };
 
-        // Auto-load game cover image
-        _ = LoadGameMediaAsync(game, stack);
+        // Auto-load game cover image (bigger to match wiki layout)
+        _ = LoadGameMediaAsync(game, stack, 236, 136);
 
         stack.Children.Add(new TextBlock
         {
@@ -413,6 +413,16 @@ public sealed class HomeView : UserControl
             FontWeight = FontWeight.Bold,
             Foreground = ThemePalette.TextPrimaryBrush,
             TextTrimming = TextTrimming.CharacterEllipsis
+        });
+
+        // Short description similar to wiki browser
+        stack.Children.Add(new TextBlock
+        {
+            Text = game.ShortDescription ?? string.Empty,
+            FontSize = 11,
+            Foreground = ThemePalette.TextMutedBrush,
+            TextWrapping = TextWrapping.Wrap,
+            MaxLines = 3
         });
 
         // Genre badges
@@ -448,66 +458,34 @@ public sealed class HomeView : UserControl
             Foreground = ThemePalette.TextMutedBrush
         });
 
-        // Create subtle shadow behind the card by overlaying a semi-transparent border
-        var shadow = new Border
-        {
-            Background = new SolidColorBrush(Color.FromArgb(28, 0, 0, 0)),
-            CornerRadius = new CornerRadius(20),
-            Width = card.Width,
-            Height = card.Height,
-            Margin = new Thickness(0, 6, 0, 0),
-            Opacity = 0.0,
-            IsHitTestVisible = false
-        };
-
         card.Child = stack;
-        card.PointerEntered += (_, __) =>
-        {
-            _ = GameWikiApp.Helpers.UiAnimation.BackgroundColorToAsync(card, ThemePalette.BgTertiary, 180);
-            _ = GameWikiApp.Helpers.UiAnimation.ScaleToAsync(card, 1.03, 150);
-            _ = GameWikiApp.Helpers.UiAnimation.OpacityToAsync(shadow, 1.0, 150);
-        };
-        card.PointerExited += (_, __) =>
-        {
-            _ = GameWikiApp.Helpers.UiAnimation.BackgroundColorToAsync(card, ThemePalette.BgCard, 180);
-            _ = GameWikiApp.Helpers.UiAnimation.ScaleToAsync(card, 1.0, 150);
-            _ = GameWikiApp.Helpers.UiAnimation.OpacityToAsync(shadow, 0.0, 150);
-        };
+        card.PointerEntered += (_, __) => card.Background = ThemePalette.BgTertiaryBrush;
+        card.PointerExited += (_, __) => card.Background = ThemePalette.BgCardBrush;
         card.PointerPressed += (_, __) => _openGame(game.GameId);
-
-        var container = new Grid
-        {
-            Width = card.Width,
-            Height = card.Height + 6
-        };
-        container.Children.Add(shadow);
-        container.Children.Add(card);
-        return container;
+        return card;
     }
 
-    private static async Task LoadGameMediaAsync(Game game, StackPanel target)
+    private static async Task LoadGameMediaAsync(Game game, StackPanel target, double width = 236, double height = 136)
     {
         var bitmap = await ImageLoader.LoadAsync(game.CoverImage);
         var mediaContent = bitmap != null
             ? new Border
             {
-                Width = 236,
-                Height = 140,
-                CornerRadius = new CornerRadius(12),
+                Width = width,
+                Height = height,
+                CornerRadius = new CornerRadius(14),
                 ClipToBounds = true,
                 Child = new Image
                 {
                     Source = bitmap,
-                    Stretch = Stretch.UniformToFill,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
+                    Stretch = Stretch.UniformToFill
                 }
             } as Control
             : new Border
             {
-                Width = 236,
-                Height = 140,
-                CornerRadius = new CornerRadius(12),
+                Width = width,
+                Height = height,
+                CornerRadius = new CornerRadius(14),
                 Background = ThemePalette.BgTertiaryBrush,
                 Child = new TextBlock
                 {
@@ -533,7 +511,7 @@ public sealed class HomeView : UserControl
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(18),
             Width = 260,
-            Height = 180,
+            Height = 200,
             Margin = new Thickness(10),
             Cursor = new Cursor(StandardCursorType.Hand)
         };
@@ -555,9 +533,7 @@ public sealed class HomeView : UserControl
                 Child = new Image
                 {
                     Source = bitmap,
-                    Stretch = Stretch.UniformToFill,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
+                    Stretch = Stretch.UniformToFill
                 }
             });
         }
@@ -594,6 +570,14 @@ public sealed class HomeView : UserControl
             Text = article.GameTitle ?? "Unknown game",
             FontSize = 10.5,
             Foreground = ThemePalette.AccentBrush
+        });
+        stack.Children.Add(new TextBlock
+        {
+            Text = article.Summary ?? string.Empty,
+            FontSize = 11,
+            Foreground = ThemePalette.TextMutedBrush,
+            TextWrapping = TextWrapping.Wrap,
+            MaxLines = 2
         });
 
         card.Child = stack;

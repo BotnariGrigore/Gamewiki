@@ -28,7 +28,7 @@ namespace GameWikiApp.Helpers
 
             try
             {
-                ScaleTransform transform = null;
+                ScaleTransform? transform = null;
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     transform = control.RenderTransform as ScaleTransform;
@@ -40,7 +40,7 @@ namespace GameWikiApp.Helpers
                 });
 
                 double from = 1.0;
-                await Dispatcher.UIThread.InvokeAsync(() => { from = transform.ScaleX; });
+                await Dispatcher.UIThread.InvokeAsync(() => { from = transform?.ScaleX ?? 1.0; });
 
                 const int frameMs = 16;
                 int steps = Math.Max(1, durationMs / frameMs);
@@ -52,8 +52,11 @@ namespace GameWikiApp.Helpers
                     double value = from + (target - from) * t;
                     await Dispatcher.UIThread.InvokeAsync(() =>
                     {
-                        transform.ScaleX = value;
-                        transform.ScaleY = value;
+                        if (transform != null)
+                        {
+                            transform.ScaleX = value;
+                            transform.ScaleY = value;
+                        }
                     });
 
                     await Task.Delay(frameMs, ct).ConfigureAwait(false);
@@ -61,8 +64,11 @@ namespace GameWikiApp.Helpers
 
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    transform.ScaleX = target;
-                    transform.ScaleY = target;
+                    if (transform != null)
+                    {
+                        transform.ScaleX = target;
+                        transform.ScaleY = target;
+                    }
                 });
             }
             catch (OperationCanceledException) { }

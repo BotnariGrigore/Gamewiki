@@ -184,7 +184,7 @@ public sealed class GameEditorWindow : Window
         };
 
         row.Children.Add(editor);
-        var browse = UiFactory.CreateSubtleButton("Browse...", 80);
+        var browse = UiFactory.CreateSubtleButton("Browse...", 80, "↑");
         browse.Height = 42;
         browse.Click += async (_, __) =>
         {
@@ -229,6 +229,12 @@ public sealed class GameEditorWindow : Window
     {
         try
         {
+            var validation = await ImageValidation.ValidateLocalImageAsync(sourcePath);
+            if (!validation.Success)
+            {
+                return null;
+            }
+
             var photoDir = Path.Combine(AppContext.BaseDirectory, "Photo");
             Directory.CreateDirectory(photoDir);
 
@@ -301,16 +307,16 @@ public sealed class GameEditorWindow : Window
             Spacing = 10
         };
 
-        var save = UiFactory.CreatePrimaryButton("Save", 120);
+        var save = UiFactory.CreatePrimaryButton("Save", 120, "✓");
         save.Click += async (_, __) => await SaveAsync();
         row.Children.Add(save);
 
-        var delete = UiFactory.CreateSubtleButton("Delete", 120);
+        var delete = UiFactory.CreateSubtleButton("Delete", 120, "✕");
         delete.IsVisible = _gameId > 0;
         delete.Click += async (_, __) => await DeleteAsync();
         row.Children.Add(delete);
 
-        var close = UiFactory.CreateSubtleButton("Close", 120);
+        var close = UiFactory.CreateSubtleButton("Close", 120, "×");
         close.Click += (_, __) => Close(false);
         row.Children.Add(close);
 

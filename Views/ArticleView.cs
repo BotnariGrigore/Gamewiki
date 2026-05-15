@@ -9,6 +9,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Controls.Documents;
 using GameWikiApp.Data;
 using GameWikiApp.Models;
 using GameWikiApp.Services;
@@ -84,22 +85,8 @@ public sealed class ArticleView : UserControl
 
         var grid = new Grid
         {
-            RowDefinitions = new RowDefinitions("260,Auto")
+            RowDefinitions = new RowDefinitions("Auto")
         };
-
-        _cover.Height = 260;
-        _cover.Background = ThemePalette.BgTertiaryBrush;
-        _cover.Child = new TextBlock
-        {
-            Text = "Loading...",
-            FontSize = 18,
-            FontWeight = FontWeight.Bold,
-            Foreground = ThemePalette.TextMutedBrush,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        grid.Children.Add(_cover);
-        Grid.SetRow(_cover, 0);
 
         var header = new StackPanel
         {
@@ -161,7 +148,6 @@ public sealed class ArticleView : UserControl
         header.Children.Add(_counts);
 
         grid.Children.Add(header);
-        Grid.SetRow(header, 1);
 
         shell.Child = grid;
         return shell;
@@ -197,9 +183,14 @@ public sealed class ArticleView : UserControl
             }
         }
 
-        var regex = new System.Text.RegularExpressions.Regex(
-            @"\[\[([^\]]+)\]\]",
-            System.Text.RegularExpressions.RegexOptions.Compiled);
+        var regex = new System.Text.RegularExpressions.Regex(@"\[\[([^\]]+)\]\]", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        var tb = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ThemePalette.TextPrimaryBrush,
+            FontSize = 13
+        };
 
         var lastIndex = 0;
         var matchCollection = regex.Matches(content);
@@ -209,13 +200,7 @@ public sealed class ArticleView : UserControl
             if (match.Index > lastIndex)
             {
                 var textSegment = content[lastIndex..match.Index];
-                _contentPanel.Children.Add(new TextBlock
-                {
-                    Text = textSegment,
-                    TextWrapping = TextWrapping.Wrap,
-                    Foreground = ThemePalette.TextPrimaryBrush,
-                    FontSize = 13
-                });
+                tb.Inlines.Add(new Run(textSegment));
             }
 
             var linkText = match.Groups[1].Value.Trim();
@@ -226,61 +211,38 @@ public sealed class ArticleView : UserControl
                 continue;
             }
 
-            var linkBlock = new TextBlock
-            {
-                Text = linkText,
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = ThemePalette.AccentBrush,
-                FontSize = 13,
-                Cursor = new Cursor(StandardCursorType.Hand),
-                TextDecorations = TextDecorations.Underline
-            };
-
             if (linkMap.TryGetValue(linkText, out var targetId))
             {
+                var linkControl = new TextBlock
+                {
+                    Text = linkText,
+                    Foreground = ThemePalette.AccentBrush,
+                    TextDecorations = TextDecorations.Underline,
+                    Cursor = new Cursor(StandardCursorType.Hand),
+                    FontSize = 13
+                };
                 var capturedId = targetId;
-                linkBlock.PointerPressed += (_, __) => _openArticle(capturedId);
-                ToolTip.SetTip(linkBlock, "Open linked article");
+                linkControl.PointerPressed += (_, __) => _openArticle(capturedId);
+                tb.Inlines.Add(new InlineUIContainer { Child = linkControl });
             }
             else
             {
-                linkBlock.Foreground = ThemePalette.TextMutedBrush;
-                linkBlock.Cursor = new Cursor(StandardCursorType.Arrow);
-                linkBlock.TextDecorations = null;
+                var muted = new TextBlock
+                {
+                    Text = linkText,
+                    Foreground = ThemePalette.TextMutedBrush,
+                    FontSize = 13
+                };
+                tb.Inlines.Add(new InlineUIContainer { Child = muted });
             }
-
-            _contentPanel.Children.Add(new Border
-            {
-                Child = linkBlock,
-                Background = Brushes.Transparent,
-                BorderThickness = new Thickness(0),
-                Padding = new Thickness(0),
-                Margin = new Thickness(0)
-            });
         }
 
         if (lastIndex < content.Length)
         {
-            var remaining = content[lastIndex..];
-            _contentPanel.Children.Add(new TextBlock
-            {
-                Text = remaining,
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = ThemePalette.TextPrimaryBrush,
-                FontSize = 13
-            });
+            tb.Inlines.Add(new Run(content[lastIndex..]));
         }
 
-        if (_contentPanel.Children.Count == 0)
-        {
-            _contentPanel.Children.Add(new TextBlock
-            {
-                Text = content,
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = ThemePalette.TextPrimaryBrush,
-                FontSize = 13
-            });
-        }
+        _contentPanel.Children.Add(tb);
     }
 
     private Control BuildGallerySection()
@@ -381,7 +343,6 @@ public sealed class ArticleView : UserControl
             _counts.Text = string.Empty;
             _gameChip.Text = "Unknown game";
             _contentText.Text = string.Empty;
-            _cover.Child = BuildCoverContent(null, "Article not found");
             _isLiked = false;
             _isSaved = false;
             _editButton.IsVisible = false;
@@ -395,7 +356,18 @@ public sealed class ArticleView : UserControl
             return;
         }
 
-        await _articles.IncrementViewsAsync(_articleId);
+        if (AppState.CurrentUser != null)
+        {
+            try
+            {
+                await _articles.TrackViewOnceAsync(_articleId, AppState.CurrentUser.UserId);
+            }
+            catch
+            {
+                // Keep the page usable even if view tracking fails.
+            }
+        }
+
         _article = await _articles.GetByIdAsync(_articleId);
         if (_article == null)
         {
@@ -404,7 +376,6 @@ public sealed class ArticleView : UserControl
             _counts.Text = string.Empty;
             _gameChip.Text = "Unknown game";
             _contentText.Text = string.Empty;
-            _cover.Child = BuildCoverContent(null, "Article not found");
             _isLiked = false;
             _isSaved = false;
             _editButton.IsVisible = false;
@@ -423,8 +394,7 @@ public sealed class ArticleView : UserControl
         var articleLinks = (await _articles.GetLinkedArticlesAsync(_articleId)).ToList();
         BuildContentWithLinks(_article.Content, articleLinks);
 
-        var bitmap = await ImageLoader.LoadAsync(_article.CoverImage);
-        _cover.Child = BuildCoverContent(bitmap, _article.Title);
+        // Cover image removed from header; use gallery or related sections instead.
 
         _editButton.IsVisible = AppState.CurrentUser != null &&
                                 (AppState.IsAdmin || AppState.CurrentUser.UserId == _article.AuthorId);
@@ -453,7 +423,7 @@ public sealed class ArticleView : UserControl
             return new Image
             {
                 Source = bitmap,
-                Stretch = Stretch.Uniform,
+                Stretch = Stretch.UniformToFill,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };

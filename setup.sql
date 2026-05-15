@@ -1,4 +1,3 @@
--- GameWikiApp Database Setup Script
 CREATE DATABASE IF NOT EXISTS game_wiki_platform;
 USE game_wiki_platform;
 
@@ -31,11 +30,11 @@ CREATE TABLE users (
     profile_image VARCHAR(255),
     bio TEXT,
 
-    theme_preference ENUM('dark', 'light') NOT NULL DEFAULT 'dark',
-
     is_online BOOLEAN DEFAULT FALSE,
 
     last_seen DATETIME,
+
+    theme_preference VARCHAR(20) DEFAULT 'light',
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -45,9 +44,6 @@ CREATE TABLE users (
         ON DELETE RESTRICT
         ON UPDATE CASCADE
 );
-
-ALTER TABLE users
-ADD COLUMN IF NOT EXISTS theme_preference ENUM('dark', 'light') NOT NULL DEFAULT 'dark';
 
 -- =====================================================
 -- PRIETENI
@@ -79,6 +75,12 @@ CREATE TABLE friends (
     CONSTRAINT uq_friendship
         UNIQUE(user_id, friend_id)
 );
+
+CREATE INDEX idx_friends_user_status
+ON friends(user_id, status);
+
+CREATE INDEX idx_friends_friend_status
+ON friends(friend_id, status);
 
 -- =====================================================
 -- CATEGORII JOCURI
@@ -369,6 +371,36 @@ CREATE TABLE article_likes (
 );
 
 -- =====================================================
+-- VIZUALIZARI PAGINI
+-- o pagina/articol se contorizeaza o singura data per user
+-- =====================================================
+
+CREATE TABLE page_views (
+    view_id INT AUTO_INCREMENT PRIMARY KEY,
+
+    page_type VARCHAR(20) NOT NULL,
+    page_id INT NOT NULL,
+    user_id INT NOT NULL,
+
+    viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_page_views_users
+        FOREIGN KEY (user_id)
+        REFERENCES users(user_id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+
+    CONSTRAINT uq_page_view
+        UNIQUE(page_type, page_id, user_id)
+);
+
+CREATE INDEX idx_page_views_page
+ON page_views(page_type, page_id, viewed_at);
+
+CREATE INDEX idx_page_views_user
+ON page_views(user_id, page_type, viewed_at);
+
+-- =====================================================
 -- ARTICOLE SALVATE
 -- =====================================================
 
@@ -475,6 +507,9 @@ CREATE TABLE conversation_participants (
         UNIQUE(conversation_id, user_id)
 );
 
+CREATE INDEX idx_participants_user_conversation
+ON conversation_participants(user_id, conversation_id);
+
 -- =====================================================
 -- MESAJE
 -- =====================================================
@@ -507,6 +542,9 @@ CREATE TABLE messages (
         ON UPDATE CASCADE
 );
 
+CREATE INDEX idx_messages_conversation_sent
+ON messages(conversation_id, sent_at, message_id);
+
 -- =====================================================
 -- MESAJE CITITE
 -- =====================================================
@@ -534,6 +572,9 @@ CREATE TABLE message_reads (
     CONSTRAINT uq_message_user
         UNIQUE(message_id, user_id)
 );
+
+CREATE INDEX idx_message_reads_user
+ON message_reads(user_id, message_id);
 
 -- =====================================================
 -- SESIUNI LOGIN
@@ -569,8 +610,16 @@ CREATE TABLE notifications (
 
     user_id INT NOT NULL,
 
+    source_user_id INT NULL,
+
+    notification_type VARCHAR(50) NOT NULL DEFAULT 'general',
+
     title VARCHAR(150) NOT NULL,
     message TEXT NOT NULL,
+
+    target_type VARCHAR(50),
+    target_id INT,
+    action_route VARCHAR(255),
 
     is_read BOOLEAN DEFAULT FALSE,
 
@@ -580,6 +629,11 @@ CREATE TABLE notifications (
         FOREIGN KEY (user_id)
         REFERENCES users(user_id)
         ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    CONSTRAINT fk_notifications_source_user
+        FOREIGN KEY (source_user_id)
+        REFERENCES users(user_id)
+        ON DELETE SET NULL
         ON UPDATE CASCADE
 );
 
@@ -624,6 +678,9 @@ ON article_comments(article_id);
 
 CREATE INDEX idx_notifications_user
 ON notifications(user_id);
+
+CREATE INDEX idx_notifications_user_read_created
+ON notifications(user_id, is_read, created_at);
 
 -- =====================================================
 -- FULLTEXT SEARCH

@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Threading;
 using GameWikiApp.Models;
 using GameWikiApp.Views;
 
@@ -12,6 +13,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        AppState.ThemeChanged += HandleThemeChanged;
+        Closed += (_, __) => AppState.ThemeChanged -= HandleThemeChanged;
         LoadInitialView();
     }
 
@@ -35,6 +38,31 @@ public partial class MainWindow : Window
     {
         _shell = new ShellView(HandleLogout);
         Content = _shell;
+    }
+
+    private void HandleThemeChanged()
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            RefreshThemeContent();
+            return;
+        }
+
+        Dispatcher.UIThread.Post(RefreshThemeContent);
+    }
+
+    private void RefreshThemeContent()
+    {
+        if (AppState.IsAuthenticated && _shell != null && ReferenceEquals(Content, _shell))
+        {
+            _ = _shell.RefreshThemeAsync();
+            return;
+        }
+
+        if (Content is AuthView authView)
+        {
+            _ = authView.RefreshThemeAsync();
+        }
     }
 
     private void HandleLogout()

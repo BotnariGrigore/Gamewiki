@@ -189,6 +189,36 @@ WHERE article_id = @ArticleId";
             return rows > 0;
         }
 
+        public async Task<bool> TrackViewOnceAsync(int articleId, int userId)
+        {
+            using var conn = DbConnection.GetOpen();
+            using var tran = conn.BeginTransaction();
+            try
+            {
+                var inserted = await conn.ExecuteAsync(
+                    @"INSERT IGNORE INTO page_views (page_type, page_id, user_id)
+                      VALUES ('article', @ArticleId, @UserId)",
+                    new { ArticleId = articleId, UserId = userId },
+                    tran) > 0;
+
+                if (inserted)
+                {
+                    await conn.ExecuteAsync(
+                        "UPDATE wiki_articles SET views_count = views_count + 1 WHERE article_id = @ArticleId",
+                        new { ArticleId = articleId },
+                        tran);
+                }
+
+                tran.Commit();
+                return inserted;
+            }
+            catch
+            {
+                tran.Rollback();
+                throw;
+            }
+        }
+
         public async Task<Dictionary<string, int>> ResolveTitlesToIdsAsync(int gameId, IEnumerable<string> titles)
         {
             using var conn = DbConnection.GetOpen();

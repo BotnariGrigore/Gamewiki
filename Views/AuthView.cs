@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -24,141 +25,264 @@ public sealed class AuthView : UserControl
     private TextBox _registerPassword = null!;
     private TextBox _registerConfirm = null!;
     private TextBlock _registerError = null!;
+    private Button _themeButton = null!;
 
     public AuthView(Action<User> onAuthenticated)
     {
         _onAuthenticated = onAuthenticated;
+        Content = BuildLayout();
+        _ = LoadDatabaseStatusAsync();
+    }
 
-        var root = new Grid
+    private Control BuildLayout()
+    {
+        var scroll = new ScrollViewer
         {
-            ColumnDefinitions = new ColumnDefinitions("*,*"),
-            Background = ThemePalette.BgPrimaryBrush
+            Background = ThemePalette.BgPrimaryBrush,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
 
-        var brandPanel = BuildBrandPanel();
+        var frame = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("1.05*,0.95*"),
+            ColumnSpacing = 20,
+            Margin = new Thickness(24),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Top,
+            MaxWidth = 1280
+        };
 
-        var formCard = new Border
+        var outer = new Grid
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        outer.Children.Add(frame);
+        scroll.Content = outer;
+
+        var brandPanel = BuildBrandPanel();
+        var formPanel = BuildFormPanel();
+        frame.Children.Add(brandPanel);
+        frame.Children.Add(formPanel);
+        Grid.SetColumn(formPanel, 1);
+
+        return scroll;
+    }
+
+    private Border BuildBrandPanel()
+    {
+        var panel = new Border
+        {
+            Background = ThemePalette.SurfaceBrush,
+            BorderBrush = ThemePalette.BorderLightBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(28),
+            Padding = new Thickness(28),
+            ClipToBounds = true
+        };
+
+        var stack = new StackPanel
+        {
+            Spacing = 18
+        };
+
+        var topRow = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto")
+        };
+
+        var brand = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 14
+        };
+
+        brand.Children.Add(new Border
+        {
+            Width = 56,
+            Height = 56,
+            Background = ThemePalette.AccentBrush,
+            CornerRadius = new CornerRadius(18),
+            Child = new TextBlock
+            {
+                Text = "NX",
+                FontSize = 20,
+                FontWeight = FontWeight.Bold,
+                Foreground = ThemePalette.AccentForegroundBrush,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            }
+        });
+
+        var brandText = new StackPanel
+        {
+            Spacing = 4,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        brandText.Children.Add(new TextBlock
+        {
+            Text = "Nexoria",
+            FontSize = 26,
+            FontWeight = FontWeight.Bold,
+            Foreground = ThemePalette.TextPrimaryBrush
+        });
+        brandText.Children.Add(new TextBlock
+        {
+            Text = "Game Wiki Platform",
+            FontSize = 12,
+            Foreground = ThemePalette.TextMutedBrush
+        });
+        brand.Children.Add(brandText);
+        topRow.Children.Add(brand);
+
+        _themeButton = UiFactory.CreateSubtleButton(AppState.IsDark ? "Light mode" : "Dark mode", 128, "◐");
+        _themeButton.HorizontalAlignment = HorizontalAlignment.Right;
+        _themeButton.Click += (_, __) =>
+        {
+            var nextTheme = AppState.IsDark ? "light" : "dark";
+            AppState.ApplyThemePreference(nextTheme);
+            UpdateThemeButton();
+        };
+        topRow.Children.Add(_themeButton);
+        Grid.SetColumn(_themeButton, 1);
+        stack.Children.Add(topRow);
+
+        stack.Children.Add(new TextBlock
+        {
+            Text = "A cleaner community workspace for games, articles, chat, and moderation.",
+            FontSize = 14,
+            Foreground = ThemePalette.TextSecondaryBrush,
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 430
+        });
+
+        stack.Children.Add(BuildFeature("Browse wiki pages", "⌕", "Search games, pages, and categories from one place."));
+        stack.Children.Add(BuildFeature("Private chat", "✉", "Talk with friends, send images, and keep conversations organized."));
+        stack.Children.Add(BuildFeature("Moderation tools", "⚙", "Manage content, games, and categories without leaving the platform."));
+
+        stack.Children.Add(new Border
+        {
+            Background = ThemePalette.BgTertiaryBrush,
+            BorderBrush = ThemePalette.BorderLightBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(22),
+            Padding = new Thickness(18),
+            Child = new StackPanel
+            {
+                Spacing = 6,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = "NX community hub",
+                        FontSize = 12,
+                        FontWeight = FontWeight.Bold,
+                        Foreground = ThemePalette.TextMutedBrush
+                    },
+                    new TextBlock
+                    {
+                        Text = "Modern, minimal, and tuned for fast browsing.",
+                        FontSize = 13,
+                        Foreground = ThemePalette.TextPrimaryBrush,
+                        TextWrapping = TextWrapping.Wrap
+                    }
+                }
+            }
+        });
+
+        panel.Child = stack;
+        return panel;
+    }
+
+    private Control BuildFormPanel()
+    {
+        var panel = new Border
         {
             Background = ThemePalette.BgSecondaryBrush,
             BorderBrush = ThemePalette.BorderLightBrush,
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(0),
-            Padding = new Thickness(24),
-            Margin = new Thickness(0),
-            VerticalAlignment = VerticalAlignment.Stretch,
-            HorizontalAlignment = HorizontalAlignment.Stretch
+            CornerRadius = new CornerRadius(28),
+            Padding = new Thickness(28),
+            ClipToBounds = true
         };
 
-        var formStack = new StackPanel
+        var stack = new StackPanel
         {
-            Spacing = 14,
-            VerticalAlignment = VerticalAlignment.Center
+            Spacing = 16
         };
 
-        formStack.Children.Add(new TextBlock
+        stack.Children.Add(new TextBlock
         {
             Text = "Welcome back",
-            FontSize = 22,
+            FontSize = 24,
             FontWeight = FontWeight.Bold,
             Foreground = ThemePalette.TextPrimaryBrush
         });
 
-        formStack.Children.Add(new TextBlock
+        stack.Children.Add(new TextBlock
         {
-            Text = "Sign in or create a community account to continue.",
-            FontSize = 12,
-            Foreground = ThemePalette.TextSecondaryBrush
+            Text = "Sign in or create a new account to continue.",
+            FontSize = 13,
+            Foreground = ThemePalette.TextSecondaryBrush,
+            TextWrapping = TextWrapping.Wrap
         });
 
         _tabs = new TabControl
         {
             Margin = new Thickness(0, 6, 0, 0)
         };
-
         _tabs.Items.Add(BuildLoginTab());
         _tabs.Items.Add(BuildRegisterTab());
-        formStack.Children.Add(_tabs);
+        stack.Children.Add(_tabs);
 
-        formCard.Child = formStack;
-
-        brandPanel.VerticalAlignment = VerticalAlignment.Stretch;
-        brandPanel.Margin = new Thickness(0);
-        root.Children.Add(brandPanel);
-        Grid.SetColumn(brandPanel, 0);
-
-        root.Children.Add(formCard);
-        Grid.SetColumn(formCard, 1);
-
-        Content = root;
-
-        _ = LoadDatabaseStatusAsync();
+        panel.Child = stack;
+        return panel;
     }
 
-    private Control BuildBrandPanel()
+    private Border BuildFeature(string title, string icon, string description)
     {
-        var border = new Border
+        var shell = new Border
         {
-            Background = ThemePalette.SurfaceBrush,
-            Padding = new Thickness(24),
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            VerticalAlignment = VerticalAlignment.Stretch,
-            Child = new StackPanel
-            {
-                VerticalAlignment = VerticalAlignment.Center,
-                Spacing = 14,
-                Children =
-                {
-                    new TextBlock
-                    {
-                        Text = "Sign in to continue",
-                        FontSize = 28,
-                        FontWeight = FontWeight.Bold,
-                        Foreground = ThemePalette.TextPrimaryBrush
-                    },
-                    new TextBlock
-                    {
-                        Text = "Browse pages, manage games, organize genres, and moderate wiki categories from one place.",
-                        FontSize = 12,
-                        Foreground = ThemePalette.TextSecondaryBrush,
-                        TextWrapping = TextWrapping.Wrap,
-                        MaxWidth = 300
-                    },
-                    new StackPanel
-                    {
-                        Orientation = Orientation.Horizontal,
-                        HorizontalAlignment = HorizontalAlignment.Left,
-                        Spacing = 8,
-                        Children =
-                        {
-                            new Button
-                            {
-                                Content = AppState.IsDark ? "Switch to light" : "Switch to dark",
-                                Background = Brushes.Transparent,
-                                BorderBrush = ThemePalette.BorderLightBrush,
-                                Foreground = ThemePalette.TextPrimaryBrush,
-                                CornerRadius = new CornerRadius(8),
-                                Padding = new Thickness(8,4)
-                            }
-                        }
-                    }
-                }
-            }
+            Background = ThemePalette.BgSecondaryBrush,
+            BorderBrush = ThemePalette.BorderLightBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(20),
+            Padding = new Thickness(16)
         };
-        // Theme toggle handler: recreate the auth view so brushes refresh
-        if (border.Child is StackPanel sp && sp.Children.Count > 2 && sp.Children[2] is StackPanel btnRow && btnRow.Children.Count > 0 && btnRow.Children[0] is Button themeBtn)
+
+        var grid = new Grid
         {
-            themeBtn.Click += (_, __) =>
-            {
-                var nextTheme = AppState.IsDark ? "light" : "dark";
-                AppState.ApplyThemePreference(nextTheme);
-                var owner = TopLevel.GetTopLevel(this) as Window;
-                if (owner != null)
-                {
-                    owner.Content = new AuthView(_onAuthenticated);
-                }
-            };
-        }
-        return border;
+            ColumnDefinitions = new ColumnDefinitions("Auto,*"),
+            ColumnSpacing = 12
+        };
+
+        grid.Children.Add(UiFactory.CreateIconBadge(icon, 36));
+
+        var stack = new StackPanel
+        {
+            Spacing = 4
+        };
+        stack.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 13.5,
+            FontWeight = FontWeight.Bold,
+            Foreground = ThemePalette.TextPrimaryBrush
+        });
+        stack.Children.Add(new TextBlock
+        {
+            Text = description,
+            FontSize = 11.5,
+            Foreground = ThemePalette.TextSecondaryBrush,
+            TextWrapping = TextWrapping.Wrap
+        });
+
+        grid.Children.Add(stack);
+        Grid.SetColumn(stack, 1);
+        shell.Child = grid;
+        return shell;
     }
 
     private TabItem BuildLoginTab()
@@ -171,31 +295,32 @@ public sealed class AuthView : UserControl
             TextWrapping = TextWrapping.Wrap
         };
 
-        var button = UiFactory.CreatePrimaryButton("Sign In", 160);
-        button.Margin = new Thickness(0, 8, 0, 0);
+        var button = UiFactory.CreatePrimaryButton("Sign In", 170, "↩");
         button.Click += async (_, __) => await LoginAsync();
 
-        var panel = new StackPanel
-        {
-            Spacing = 12,
-            Margin = new Thickness(0, 10, 0, 0)
-        };
-        panel.Children.Add(Label("Username or Email"));
-        panel.Children.Add(_loginIdentifier);
-        panel.Children.Add(Label("Password"));
-        panel.Children.Add(_loginPassword);
         var forgot = new TextBlock
         {
             Text = "Forgot password?",
             FontSize = 12,
             Foreground = ThemePalette.AccentBrush,
-            Margin = new Thickness(0, 4, 0, 0)
+            Cursor = new Cursor(StandardCursorType.Hand)
         };
         forgot.PointerPressed += (_, __) =>
         {
             _loginError.Foreground = ThemePalette.TextSecondaryBrush;
-            _loginError.Text = "Password reset is not implemented.";
+            _loginError.Text = "Password reset is not implemented yet.";
         };
+
+        var panel = new StackPanel
+        {
+            Spacing = 12,
+            Margin = new Thickness(0, 8, 0, 0)
+        };
+
+        panel.Children.Add(Label("Username or Email"));
+        panel.Children.Add(_loginIdentifier);
+        panel.Children.Add(Label("Password"));
+        panel.Children.Add(_loginPassword);
         panel.Children.Add(forgot);
         panel.Children.Add(button);
         panel.Children.Add(_loginError);
@@ -219,15 +344,15 @@ public sealed class AuthView : UserControl
             TextWrapping = TextWrapping.Wrap
         };
 
-        var button = UiFactory.CreatePrimaryButton("Create Account", 180);
-        button.Margin = new Thickness(0, 8, 0, 0);
+        var button = UiFactory.CreatePrimaryButton("Create Account", 190, "＋");
         button.Click += async (_, __) => await RegisterAsync();
 
         var panel = new StackPanel
         {
             Spacing = 12,
-            Margin = new Thickness(0, 10, 0, 0)
+            Margin = new Thickness(0, 8, 0, 0)
         };
+
         panel.Children.Add(Label("Username"));
         panel.Children.Add(_registerUsername);
         panel.Children.Add(Label("Email"));
@@ -263,6 +388,7 @@ public sealed class AuthView : UserControl
         {
             _loginError.Foreground = ThemePalette.ErrorBrush;
             _loginError.Text = string.Empty;
+
             var identifier = _loginIdentifier.Text?.Trim() ?? string.Empty;
             var password = _loginPassword.Text ?? string.Empty;
 
@@ -287,6 +413,7 @@ public sealed class AuthView : UserControl
     {
         _registerError.Foreground = ThemePalette.ErrorBrush;
         _registerError.Text = string.Empty;
+
         var username = _registerUsername.Text?.Trim() ?? string.Empty;
         var email = _registerEmail.Text?.Trim() ?? string.Empty;
         var password = _registerPassword.Text ?? string.Empty;
@@ -317,8 +444,22 @@ public sealed class AuthView : UserControl
         var error = await _auth.CheckDatabaseAsync();
         if (error != null)
         {
-            _loginError.Foreground = ThemePalette.ErrorBrush;
+            _loginError.Foreground = ThemePalette.WarningBrush;
             _loginError.Text = $"Database check failed: {error}";
         }
+    }
+
+    private void UpdateThemeButton()
+    {
+        if (_themeButton != null)
+        {
+            _themeButton.Content = UiFactory.CreateButtonContent(AppState.IsDark ? "Light mode" : "Dark mode", "◐");
+        }
+    }
+
+    public Task RefreshThemeAsync()
+    {
+        UpdateThemeButton();
+        return Task.CompletedTask;
     }
 }

@@ -14,6 +14,7 @@ namespace GameWikiApp.Services
         {
             try
             {
+                if (!Helpers.Validator.IsUsername(username)) return (false, "Invalid username. Use 3-50 letters, numbers, dots, underscores or hyphens.");
                 if (!Helpers.Validator.IsEmail(email)) return (false, "Invalid email address.");
                 if (!Helpers.Validator.IsStrongPassword(password)) return (false, "Password is not strong enough.");
 
@@ -107,6 +108,25 @@ namespace GameWikiApp.Services
                 using var cmd = conn.CreateCommand();
                 cmd.CommandText = "SELECT 1";
                 _ = cmd.ExecuteScalar();
+
+                // Minimal migration: ensure theme_preference column exists
+                try
+                {
+                    using var checkCmd = conn.CreateCommand();
+                    checkCmd.CommandText = "SHOW COLUMNS FROM users LIKE 'theme_preference'";
+                    var col = checkCmd.ExecuteScalar();
+                    if (col == null)
+                    {
+                        using var alterCmd = conn.CreateCommand();
+                        alterCmd.CommandText = "ALTER TABLE users ADD COLUMN IF NOT EXISTS theme_preference VARCHAR(20) DEFAULT 'light'";
+                        alterCmd.ExecuteNonQuery();
+                    }
+                }
+                catch (Exception ex2)
+                {
+                    try { File.AppendAllText("auth_errors.log", DateTime.UtcNow + " MIGRATION ERROR: " + ex2 + Environment.NewLine); } catch { }
+                }
+
                 return Task.FromResult<string?>(null);
             }
             catch (Exception ex)

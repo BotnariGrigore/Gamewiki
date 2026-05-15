@@ -47,7 +47,7 @@ public sealed class GameView : UserControl
             Background = ThemePalette.BgPrimaryBrush
         };
 
-        _content.Spacing = 14;
+        _content.Spacing = 18;
         _content.Children.Add(BuildHeader());
         _content.Children.Add(BuildCategoriesShell());
         _content.Children.Add(UiFactory.CreateSectionHeader("Articles", "Pages from this game"));
@@ -56,7 +56,7 @@ public sealed class GameView : UserControl
         _articlesPanel.Orientation = Orientation.Horizontal;
         _articlesPanel.ItemWidth = 320;
         _articlesPanel.ItemHeight = 170;
-        _articlesPanel.Margin = new Thickness(0, 0, 0, 24);
+        _articlesPanel.Margin = new Thickness(0, 0, 0, 28);
 
         Content = scroll;
     }
@@ -70,7 +70,7 @@ public sealed class GameView : UserControl
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(20),
             Padding = new Thickness(0),
-            Margin = new Thickness(0, 0, 0, 10)
+            Margin = new Thickness(0, 0, 0, 14)
         };
 
         var grid = new Grid
@@ -81,6 +81,7 @@ public sealed class GameView : UserControl
 
         _banner.Height = 280;
         _banner.Background = ThemePalette.BgTertiaryBrush;
+        _banner.ClipToBounds = true;
         _banner.Child = new TextBlock
         {
             Text = "Loading...",
@@ -204,8 +205,20 @@ public sealed class GameView : UserControl
             return;
         }
 
+        if (AppState.CurrentUser != null)
+        {
+            try
+            {
+                await _games.TrackViewOnceAsync(_gameId, AppState.CurrentUser.UserId);
+            }
+            catch
+            {
+                // Keep the page usable even if view tracking fails.
+            }
+        }
+
         _title.Text = _game.Title;
-        _description.Text = _game.ShortDescription ?? _game.FullDescription ?? "No description available.";
+        _description.Text = _game.FullDescription ?? _game.ShortDescription ?? "No description available.";
         _stats.Text = $"{_game.ArticleCount} articles | {_game.PopularityScore} views";
 
         var bitmap = await ImageLoader.LoadAsync(_game.BannerImage ?? _game.CoverImage);

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -65,7 +66,25 @@ namespace GameWikiApp.Data
             var sql = @"INSERT INTO users (role_id, username, email, password_hash, profile_image, bio, is_online, last_seen, theme_preference)
                         VALUES (@RoleId, @Username, @Email, @PasswordHash, @ProfileImage, @Bio, @IsOnline, @LastSeen, @ThemePreference);
                         SELECT LAST_INSERT_ID();";
-            return await conn.ExecuteScalarAsync<int>(sql, user);
+            try
+            {
+                return await conn.ExecuteScalarAsync<int>(sql, user);
+            }
+            catch (System.Exception ex)
+            {
+                if (ex.Message != null && ex.Message.Contains("Unknown column 'theme_preference'"))
+                {
+                    try
+                    {
+                        await conn.ExecuteAsync("ALTER TABLE users ADD COLUMN theme_preference VARCHAR(20) DEFAULT 'light'");
+                    }
+                    catch { }
+
+                    return await conn.ExecuteScalarAsync<int>(sql, user);
+                }
+
+                throw;
+            }
         }
 
         public async Task<bool> UpdateAsync(User user)
@@ -73,8 +92,27 @@ namespace GameWikiApp.Data
             using var conn = GetOpen();
             var sql = @"UPDATE users SET username = @Username, email = @Email, profile_image = @ProfileImage, bio = @Bio, is_online = @IsOnline, last_seen = @LastSeen, theme_preference = @ThemePreference
                         WHERE user_id = @UserId";
-            var res = await conn.ExecuteAsync(sql, user);
-            return res > 0;
+            try
+            {
+                var res = await conn.ExecuteAsync(sql, user);
+                return res > 0;
+            }
+            catch (System.Exception ex)
+            {
+                if (ex.Message != null && ex.Message.Contains("Unknown column 'theme_preference'"))
+                {
+                    try
+                    {
+                        await conn.ExecuteAsync("ALTER TABLE users ADD COLUMN theme_preference VARCHAR(20) DEFAULT 'light'");
+                    }
+                    catch { }
+
+                    var res = await conn.ExecuteAsync(sql, user);
+                    return res > 0;
+                }
+
+                throw;
+            }
         }
 
         public async Task<bool> UpdateRoleAsync(int userId, int roleId)
@@ -97,8 +135,52 @@ namespace GameWikiApp.Data
         {
             using var conn = GetOpen();
             var sql = "UPDATE users SET theme_preference = @ThemePreference WHERE user_id = @UserId";
-            var res = await conn.ExecuteAsync(sql, new { UserId = userId, ThemePreference = themePreference });
+            try
+            {
+                var res = await conn.ExecuteAsync(sql, new { UserId = userId, ThemePreference = themePreference });
+                return res > 0;
+            }
+            catch (System.Exception ex)
+            {
+                if (ex.Message != null && ex.Message.Contains("Unknown column 'theme_preference'"))
+                {
+                    try
+                    {
+                        await conn.ExecuteAsync("ALTER TABLE users ADD COLUMN theme_preference VARCHAR(20) DEFAULT 'light'");
+                    }
+                    catch { }
+
+                    var res = await conn.ExecuteAsync(sql, new { UserId = userId, ThemePreference = themePreference });
+                    return res > 0;
+                }
+
+                throw;
+            }
+        }
+
+        public async Task<bool> UpdatePasswordHashAsync(int userId, string passwordHash)
+        {
+            using var conn = GetOpen();
+            var sql = "UPDATE users SET password_hash = @PasswordHash WHERE user_id = @UserId";
+            var res = await conn.ExecuteAsync(sql, new { UserId = userId, PasswordHash = passwordHash });
             return res > 0;
+        }
+
+        public async Task<bool> UpdatePresenceAsync(int userId, bool isOnline, DateTime? lastSeen = null)
+        {
+            using var conn = GetOpen();
+            var sql = @"
+UPDATE users
+SET is_online = @IsOnline,
+    last_seen = @LastSeen
+WHERE user_id = @UserId";
+            var rows = await conn.ExecuteAsync(sql, new
+            {
+                UserId = userId,
+                IsOnline = isOnline,
+                LastSeen = lastSeen ?? DateTime.UtcNow
+            });
+            return rows > 0;
         }
 
         private IDbConnection GetOpen()

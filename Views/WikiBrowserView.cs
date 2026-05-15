@@ -18,7 +18,7 @@ public sealed class WikiBrowserView : UserControl
 {
     private readonly GameService _games = new();
     private readonly ArticleService _articles = new();
-    private readonly CategoryService _categories = new();
+    private readonly TagService _tags = new();
     private readonly Action<int> _openGame;
     private readonly Action<int> _openArticle;
 
@@ -28,29 +28,30 @@ public sealed class WikiBrowserView : UserControl
     private readonly TextBlock _heroTitle = new();
     private readonly TextBlock _heroSubtitle = new();
     private readonly TextBox _searchBox;
-    private readonly ComboBox _categoryBox;
-    private readonly List<Category> _categoryList = new();
+    private readonly ComboBox _genreBox;
+    private readonly List<GameTag> _genreList = new();
     private bool _suppressFilterEvents;
 
     private string _activeQuery = string.Empty;
-    private int? _activeCategoryId;
-    private string? _activeCategoryName;
+    private int? _activeGenreId;
+    private string? _activeGenreName;
 
     public WikiBrowserView(Action<int> openGame, Action<int> openArticle)
     {
         _openGame = openGame;
         _openArticle = openArticle;
 
-        _searchBox = UiFactory.CreateTextBox("Search games and articles...", 360);
-        _categoryBox = new ComboBox
+        _searchBox = UiFactory.CreateTextBox("Search games and articles...", 320);
+        _genreBox = new ComboBox
         {
-            Width = 260,
+            Width = 240,
             Background = ThemePalette.BgInputBrush,
             BorderBrush = ThemePalette.BorderBrush,
             Foreground = ThemePalette.TextPrimaryBrush,
             CornerRadius = new CornerRadius(12),
             Padding = new Thickness(12, 10)
         };
+        _genreBox.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(GameTag.TagName));
 
         var scroll = new ScrollViewer
         {
@@ -60,46 +61,46 @@ public sealed class WikiBrowserView : UserControl
             Background = ThemePalette.BgPrimaryBrush
         };
 
-        _content.Spacing = 14;
-        _content.Margin = new Thickness(0);
+        _content.Spacing = 30;
+        _content.Margin = new Thickness(24, 0, 24, 28);
         _content.Children.Add(BuildHeroShell());
-        _content.Children.Add(UiFactory.CreateSectionHeader("Games", "Browse all wiki pages"));
+        _content.Children.Add(UiFactory.CreateSectionHeader("Games"));
         _content.Children.Add(_gamesPanel);
-        _content.Children.Add(UiFactory.CreateSectionHeader("Articles", "Community pages and guides"));
+        _content.Children.Add(UiFactory.CreateSectionHeader("Articles"));
         _content.Children.Add(_articlesPanel);
 
         _gamesPanel.Orientation = Orientation.Horizontal;
         _gamesPanel.ItemWidth = 260;
         _gamesPanel.ItemHeight = 270;
         _gamesPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
-        _gamesPanel.Margin = new Thickness(0, 0, 0, 16);
+        _gamesPanel.Margin = new Thickness(0, 0, 0, 36);
 
         _articlesPanel.Orientation = Orientation.Horizontal;
         _articlesPanel.ItemWidth = 260;
         _articlesPanel.ItemHeight = 200;
         _articlesPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
-        _articlesPanel.Margin = new Thickness(0, 0, 0, 24);
+        _articlesPanel.Margin = new Thickness(0, 0, 0, 36);
 
         _searchBox.KeyDown += async (_, e) =>
         {
             if (e.Key == Key.Enter)
             {
                 e.Handled = true;
-                await LoadAsync(_searchBox.Text ?? string.Empty, _activeCategoryId, _activeCategoryName);
+                await LoadAsync(_searchBox.Text ?? string.Empty, _activeGenreId, _activeGenreName);
             }
         };
 
-        _categoryBox.SelectionChanged += async (_, __) =>
+        _genreBox.SelectionChanged += async (_, __) =>
         {
             if (_suppressFilterEvents)
             {
                 return;
             }
 
-            var selected = _categoryBox.SelectedItem as Category;
-            _activeCategoryId = selected?.CategoryId;
-            _activeCategoryName = selected?.ToString();
-            await LoadAsync(_searchBox.Text ?? string.Empty, _activeCategoryId, _activeCategoryName);
+            var selected = _genreBox.SelectedItem as GameTag;
+            _activeGenreId = selected?.TagId;
+            _activeGenreName = selected?.TagName;
+            await LoadAsync(_searchBox.Text ?? string.Empty, _activeGenreId, _activeGenreName);
         };
 
         Content = scroll;
@@ -114,12 +115,12 @@ public sealed class WikiBrowserView : UserControl
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(20),
             Padding = new Thickness(24),
-            Margin = new Thickness(0, 0, 0, 10)
+            Margin = new Thickness(0, 0, 0, 24)
         };
 
         var grid = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("2*,1*")
+            ColumnDefinitions = new ColumnDefinitions("*")
         };
 
         var left = new StackPanel
@@ -140,7 +141,7 @@ public sealed class WikiBrowserView : UserControl
         _heroTitle.FontWeight = FontWeight.Bold;
         _heroTitle.Foreground = ThemePalette.TextPrimaryBrush;
 
-        _heroSubtitle.Text = "Search by title, game, or category and jump directly into a page.";
+        _heroSubtitle.Text = "Search by title, game, or genre and jump directly into a page.";
         _heroSubtitle.FontSize = 13;
         _heroSubtitle.Foreground = ThemePalette.TextSecondaryBrush;
         _heroSubtitle.TextWrapping = TextWrapping.Wrap;
@@ -149,120 +150,84 @@ public sealed class WikiBrowserView : UserControl
         left.Children.Add(_heroTitle);
         left.Children.Add(_heroSubtitle);
 
-        var filters = new StackPanel
+        var filters = new WrapPanel
         {
-            Orientation = Orientation.Horizontal,
-            Spacing = 10,
-            Margin = new Thickness(0, 14, 0, 0)
+            Margin = new Thickness(0, 14, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Stretch
         };
-        filters.Children.Add(_searchBox);
-        filters.Children.Add(_categoryBox);
+
+        _searchBox.Margin = new Thickness(0, 0, 10, 10);
+        _genreBox.Margin = new Thickness(0, 0, 10, 10);
 
         var searchButton = UiFactory.CreatePrimaryButton("Search", 90);
-        searchButton.Click += async (_, __) => await LoadAsync(_searchBox.Text ?? string.Empty, _activeCategoryId, _activeCategoryName);
-        filters.Children.Add(searchButton);
+        searchButton.Click += async (_, __) => await LoadAsync(_searchBox.Text ?? string.Empty, _activeGenreId, _activeGenreName);
+        searchButton.Margin = new Thickness(0, 0, 10, 10);
 
         var clearButton = UiFactory.CreateSubtleButton("Clear", 90);
         clearButton.Click += async (_, __) =>
         {
             _suppressFilterEvents = true;
             _searchBox.Text = string.Empty;
-            _categoryBox.SelectedIndex = 0;
+            _genreBox.SelectedIndex = 0;
             _suppressFilterEvents = false;
             await LoadAsync(string.Empty, null, null);
         };
+        clearButton.Margin = new Thickness(0, 0, 10, 10);
+
+        filters.Children.Add(_searchBox);
+        filters.Children.Add(_genreBox);
+        filters.Children.Add(searchButton);
         filters.Children.Add(clearButton);
 
         left.Children.Add(filters);
         grid.Children.Add(left);
 
-        var right = new StackPanel
-        {
-            Spacing = 12,
-            VerticalAlignment = VerticalAlignment.Top
-        };
-        right.Children.Add(CreateStatTile("Games", "Browse all"));
-        right.Children.Add(CreateStatTile("Articles", "Read guides"));
-        grid.Children.Add(right);
-        Grid.SetColumn(right, 1);
-
         hero.Child = grid;
         return hero;
     }
 
-    private Border CreateStatTile(string title, string caption)
-    {
-        var card = UiFactory.CreateCard(220, 74, 0);
-        card.Background = ThemePalette.BgSecondaryBrush;
-        card.Padding = new Thickness(16, 12);
-
-        var stack = new StackPanel
-        {
-            Spacing = 2
-        };
-
-        stack.Children.Add(new TextBlock
-        {
-            Text = title,
-            FontSize = 11,
-            FontWeight = FontWeight.Bold,
-            Foreground = ThemePalette.TextMutedBrush
-        });
-
-        stack.Children.Add(new TextBlock
-        {
-            Text = caption,
-            FontSize = 20,
-            FontWeight = FontWeight.Bold,
-            Foreground = ThemePalette.TextPrimaryBrush
-        });
-
-        card.Child = stack;
-        return card;
-    }
-
-    public async Task LoadAsync(string query, int? categoryId = null, string? categoryName = null)
+    public async Task LoadAsync(string query, int? genreId = null, string? genreName = null)
     {
         _activeQuery = query?.Trim() ?? string.Empty;
-        _activeCategoryId = categoryId;
-        _activeCategoryName = categoryName;
+        _activeGenreId = genreId;
+        _activeGenreName = genreName;
 
-        var categories = (await _categories.GetAllAsync()).ToList();
-        _categoryList.Clear();
-        _categoryList.Add(new Category { CategoryId = 0, CategoryName = "All categories" });
-        _categoryList.AddRange(categories);
+        var genres = (await _tags.GetAllAsync()).ToList();
+        _genreList.Clear();
+        _genreList.Add(new GameTag { TagId = 0, TagName = "All genres" });
+        _genreList.AddRange(genres);
         _suppressFilterEvents = true;
-        _categoryBox.ItemsSource = _categoryList;
-        if (_activeCategoryId.HasValue)
+        _genreBox.ItemsSource = _genreList;
+        if (_activeGenreId.HasValue)
         {
-            _categoryBox.SelectedItem = _categoryList.FirstOrDefault(x => x.CategoryId == _activeCategoryId.Value) ?? _categoryList[0];
+            _genreBox.SelectedItem = _genreList.FirstOrDefault(x => x.TagId == _activeGenreId.Value) ?? _genreList[0];
         }
         else
         {
-            _categoryBox.SelectedIndex = 0;
+            _genreBox.SelectedIndex = 0;
         }
         _suppressFilterEvents = false;
 
         var search = _activeQuery;
-        var selectedCategory = _categoryBox.SelectedItem as Category;
-        var selectedCategoryId = selectedCategory?.CategoryId ?? 0;
-        var selectedCategoryLabel = selectedCategoryId > 0
-            ? selectedCategory?.ToString()
-            : _activeCategoryName;
-        _activeCategoryName = selectedCategoryLabel;
+        var selectedGenre = _genreBox.SelectedItem as GameTag;
+        var selectedGenreId = selectedGenre?.TagId ?? 0;
+        var selectedGenreLabel = selectedGenreId > 0
+            ? selectedGenre?.TagName
+            : _activeGenreName;
+        _activeGenreName = selectedGenreLabel;
 
         _heroTitle.Text = string.IsNullOrWhiteSpace(search)
-            ? string.IsNullOrWhiteSpace(selectedCategoryLabel)
+            ? string.IsNullOrWhiteSpace(selectedGenreLabel)
                 ? "All wiki pages"
-                : selectedCategoryLabel!
+                : selectedGenreLabel!
             : $"Results for \"{search}\"";
 
         _heroSubtitle.Text = string.IsNullOrWhiteSpace(search)
-            ? "Search by title, game, or category and jump directly into a page."
+            ? "Search by title, game, or genre and jump directly into a page."
             : $"Showing matches for \"{search}\".";
 
-        var games = await LoadGamesAsync(search, selectedCategory);
-        var articles = await LoadArticlesAsync(search, selectedCategoryId);
+        var games = await LoadGamesAsync(search, selectedGenre);
+        var articles = await LoadArticlesAsync(search, selectedGenreId);
 
         _gamesPanel.Children.Clear();
         if (games.Count == 0)
@@ -293,13 +258,12 @@ public sealed class WikiBrowserView : UserControl
         }
     }
 
-    private async Task<List<Game>> LoadGamesAsync(string query, Category? selectedCategory)
+    private async Task<List<Game>> LoadGamesAsync(string query, GameTag? selectedGenre)
     {
         IEnumerable<Game> games;
-        if (selectedCategory != null && selectedCategory.CategoryId > 0)
+        if (selectedGenre != null && selectedGenre.TagId > 0)
         {
-            var game = await _games.GetByIdAsync(selectedCategory.GameId);
-            games = game != null ? new[] { game } : Array.Empty<Game>();
+            games = await _tags.GetGamesByTagNameAsync(selectedGenre.TagName);
         }
         else if (!string.IsNullOrWhiteSpace(query))
         {
@@ -318,15 +282,30 @@ public sealed class WikiBrowserView : UserControl
                 (game.FullDescription ?? string.Empty).Contains(query, StringComparison.OrdinalIgnoreCase));
         }
 
-        return games.ToList();
+        return games.GroupBy(g => g.GameId).Select(g => g.First()).ToList();
     }
 
-    private async Task<List<WikiArticle>> LoadArticlesAsync(string query, int selectedCategoryId)
+    private async Task<List<WikiArticle>> LoadArticlesAsync(string query, int selectedGenreId)
     {
         IEnumerable<WikiArticle> articles;
-        if (selectedCategoryId > 0)
+        if (selectedGenreId > 0)
         {
-            articles = await _categories.GetArticlesAsync(selectedCategoryId);
+            var selectedGenre = _genreList.FirstOrDefault(g => g.TagId == selectedGenreId);
+            if (selectedGenre != null)
+            {
+                var games = (await _tags.GetGamesByTagNameAsync(selectedGenre.TagName)).ToList();
+                var articleList = new List<WikiArticle>();
+                foreach (var game in games)
+                {
+                    var art = await _articles.GetByGameIdAsync(game.GameId);
+                    articleList.AddRange(art);
+                }
+                articles = articleList;
+            }
+            else
+            {
+                articles = Array.Empty<WikiArticle>();
+            }
         }
         else if (!string.IsNullOrWhiteSpace(query))
         {
@@ -345,7 +324,7 @@ public sealed class WikiBrowserView : UserControl
                 (article.Content ?? string.Empty).Contains(query, StringComparison.OrdinalIgnoreCase));
         }
 
-        return articles.ToList();
+        return articles.GroupBy(a => a.ArticleId).Select(g => g.First()).ToList();
     }
 
     private Control BuildEmptyState(string text)
@@ -380,7 +359,8 @@ public sealed class WikiBrowserView : UserControl
             Margin = new Thickness(12),
             Padding = new Thickness(12),
             Cursor = new Cursor(StandardCursorType.Hand),
-            RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative)
+            RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative),
+            ClipToBounds = true
         };
 
         var stack = new StackPanel
@@ -442,7 +422,7 @@ public sealed class WikiBrowserView : UserControl
         var container = new Grid
         {
             Width = card.Width,
-            Height = card.Height + 6
+            Height = card.Height + 8
         };
         container.Children.Add(shadow);
         container.Children.Add(card);
@@ -459,8 +439,9 @@ public sealed class WikiBrowserView : UserControl
             CornerRadius = new CornerRadius(18),
             Width = 260,
             Height = 200,
-            Margin = new Thickness(10),
-            Cursor = new Cursor(StandardCursorType.Hand)
+            Margin = new Thickness(12),
+            Cursor = new Cursor(StandardCursorType.Hand),
+            ClipToBounds = true
         };
 
         var stack = new StackPanel

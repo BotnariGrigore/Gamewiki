@@ -116,6 +116,28 @@ WHERE game_id = @GameId";
             return res > 0;
         }
 
+        public async Task<bool> TrackViewOnceAsync(int gameId, int userId)
+        {
+            using var conn = DbConnection.GetOpen();
+            using var tran = conn.BeginTransaction();
+            try
+            {
+                var inserted = await conn.ExecuteAsync(
+                    @"INSERT IGNORE INTO page_views (page_type, page_id, user_id)
+                      VALUES ('game', @GameId, @UserId)",
+                    new { GameId = gameId, UserId = userId },
+                    tran) > 0;
+
+                tran.Commit();
+                return inserted;
+            }
+            catch
+            {
+                tran.Rollback();
+                throw;
+            }
+        }
+
         private async Task LoadGenresAsync(List<Game> games)
         {
             if (games.Count == 0) return;
