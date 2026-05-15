@@ -52,3 +52,17 @@
 15.05.2026 07:37:04 AUTH: User=Slava, PasswordValid=False
 15.05.2026 07:37:06 AUTH: User=Slava, PasswordValid=True
 15.05.2026 07:44:29 AUTH: User=Anton, PasswordValid=True
+15.05.2026 08:08:25 AUTH: User=Anton, PasswordValid=True
+15.05.2026 08:15:38 AUTH: User=Slava, PasswordValid=True
+15.05.2026 08:21:05 AUTH: User=Denis, PasswordValid=False
+15.05.2026 08:21:17 AUTH: User=Anton, PasswordValid=False
+15.05.2026 08:21:19 AUTH: User=Anton, PasswordValid=False
+15.05.2026 08:21:19 AUTH: User=Anton, PasswordValid=False
+15.05.2026 08:21:28 AUTH: User=Anton, PasswordValid=True
+15.05.2026 08:21:56 AUTH: User=Slava, PasswordValid=True
+15.05.2026 08:26:32 AUTH: User=Anton, PasswordValid=False
+15.05.2026 08:26:41 AUTH: User=Slava, PasswordValid=True
+15.05.2026 08:30:39 AUTH: User=Slava, PasswordValid=True
+15.05.2026 08:34:43 AUTH: User=Slava, PasswordValid=True
+15.05.2026 08:35:36 AUTH: User=Anton, PasswordValid=True
+15.05.2026 08:56:22 AUTH: User=Slava, PasswordValid=True

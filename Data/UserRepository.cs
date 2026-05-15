@@ -53,6 +53,53 @@ namespace GameWikiApp.Data
             return await conn.QueryAsync<User>(sql);
         }
 
+        public async Task<IEnumerable<UserWithStats>> GetAllWithStatsAsync()
+        {
+            using var conn = GetOpen();
+            var sql = @"
+SELECT
+    u.user_id AS UserId,
+    u.role_id AS RoleId,
+    r.role_name AS RoleName,
+    u.username AS Username,
+    u.email AS Email,
+    u.profile_image AS ProfileImage,
+    u.bio AS Bio,
+    u.is_online AS IsOnline,
+    u.last_seen AS LastSeen,
+    u.theme_preference AS ThemePreference,
+    u.created_at AS CreatedAt,
+    COALESCE(g.game_count, 0) AS GameCount,
+    COALESCE(a.article_count, 0) AS ArticleCount,
+    COALESCE(c.comment_count, 0) AS CommentCount,
+    COALESCE(f.friend_count, 0) AS FriendCount
+FROM users u
+INNER JOIN roles r ON r.role_id = u.role_id
+LEFT JOIN (
+    SELECT created_by, COUNT(*) AS game_count
+    FROM games
+    GROUP BY created_by
+) g ON g.created_by = u.user_id
+LEFT JOIN (
+    SELECT author_id, COUNT(*) AS article_count
+    FROM wiki_articles
+    GROUP BY author_id
+) a ON a.author_id = u.user_id
+LEFT JOIN (
+    SELECT user_id, COUNT(*) AS comment_count
+    FROM article_comments
+    GROUP BY user_id
+) c ON c.user_id = u.user_id
+LEFT JOIN (
+    SELECT user_id, COUNT(*) AS friend_count
+    FROM friends
+    WHERE status = 'accepted'
+    GROUP BY user_id
+) f ON f.user_id = u.user_id
+ORDER BY u.created_at DESC";
+            return await conn.QueryAsync<UserWithStats>(sql);
+        }
+
         public async Task<int> GetAdminCountAsync()
         {
             using var conn = GetOpen();

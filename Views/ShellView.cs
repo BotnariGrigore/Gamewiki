@@ -9,6 +9,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using System.IO;
 using GameWikiApp.Data;
 using GameWikiApp.Models;
 using GameWikiApp.Services;
@@ -196,15 +197,7 @@ public sealed class ShellView : UserControl
         stack.Children.Add(_friendsChatButton);
 
         _dashboardButton = CreateNavButton("Dashboard", "▦");
-        _dashboardButton.Click += async (_, __) =>
-        {
-            if (!AppState.IsAdmin)
-            {
-                return;
-            }
-
-            await NavigateDashboardAsync();
-        };
+        _dashboardButton.Click += async (_, __) => await NavigateDashboardAsync();
         stack.Children.Add(_dashboardButton);
 
         stack.Children.Add(new Border
@@ -464,7 +457,7 @@ public sealed class ShellView : UserControl
             ? "Visitor"
             : (AppState.IsAdmin ? "Administrator" : "Member");
         _themeButton.Content = UiFactory.CreateButtonContent(AppState.IsDark ? "Light mode" : "Dark mode", "◐");
-        _dashboardButton.IsVisible = AppState.IsAdmin;
+        _dashboardButton.IsVisible = AppState.IsAuthenticated;
         _searchBox.Text = _searchQuery;
         _notificationPopup.IsOpen = false;
 
@@ -1049,13 +1042,35 @@ public sealed class ShellView : UserControl
 
         try
         {
-            var view = new DashboardView();
-            _pageHost.Content = view;
-            await view.LoadAsync();
+            if (AppState.IsAdmin)
+            {
+                var view = new DashboardView();
+                _pageHost.Content = view;
+                await view.LoadAsync();
+            }
+            else
+            {
+                var view = new UsersListView(userId => NavigateProfileAsync(userId));
+                _pageHost.Content = view;
+                await view.LoadAsync();
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            ShowPageError("Dashboard unavailable", "The admin dashboard could not be loaded. Please try again.");
+            var msg = $"The dashboard could not be loaded. {ex.Message}\n\n{ex.StackTrace}";
+            try
+            {
+                var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GameWikiApp");
+                Directory.CreateDirectory(dir);
+                var file = Path.Combine(dir, "error.log");
+                File.AppendAllText(file, $"{DateTime.UtcNow:O} - NavigateDashboardAsync: {msg}\n\n");
+            }
+            catch
+            {
+                // ignore logging failures
+            }
+
+            ShowPageError("Dashboard unavailable", msg);
         }
     }
 
