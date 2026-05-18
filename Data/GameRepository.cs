@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,6 +10,8 @@ namespace GameWikiApp.Data
 {
     public class GameRepository
     {
+        private static readonly TimeSpan ViewCooldown = TimeSpan.FromMinutes(30);
+
         private const string BaseSelect = @"
 SELECT g.game_id AS GameId,
        g.created_by AS CreatedBy,
@@ -122,14 +125,40 @@ WHERE game_id = @GameId";
             using var tran = conn.BeginTransaction();
             try
             {
-                var inserted = await conn.ExecuteAsync(
-                    @"INSERT IGNORE INTO page_views (page_type, page_id, user_id)
-                      VALUES ('game', @GameId, @UserId)",
+                var lastViewedAt = await conn.ExecuteScalarAsync<DateTime?>(
+                    @"SELECT viewed_at
+                      FROM page_views
+                      WHERE page_type = 'game'
+                        AND page_id = @GameId
+                        AND user_id = @UserId
+                      LIMIT 1",
                     new { GameId = gameId, UserId = userId },
-                    tran) > 0;
+                    tran);
+
+                var shouldIncrement = false;
+                if (!lastViewedAt.HasValue)
+                {
+                    shouldIncrement = await conn.ExecuteAsync(
+                        @"INSERT INTO page_views (page_type, page_id, user_id, viewed_at)
+                          VALUES ('game', @GameId, @UserId, NOW())",
+                        new { GameId = gameId, UserId = userId },
+                        tran) > 0;
+                }
+                else if (DateTime.Now - lastViewedAt.Value >= ViewCooldown)
+                {
+                    await conn.ExecuteAsync(
+                        @"UPDATE page_views
+                          SET viewed_at = NOW()
+                          WHERE page_type = 'game'
+                            AND page_id = @GameId
+                            AND user_id = @UserId",
+                        new { GameId = gameId, UserId = userId },
+                        tran);
+                    shouldIncrement = true;
+                }
 
                 tran.Commit();
-                return inserted;
+                return shouldIncrement;
             }
             catch
             {

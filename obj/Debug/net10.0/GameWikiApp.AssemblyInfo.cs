@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GameWikiApp")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b35d203daf30d896236791c2431962cb24c8c772")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8f7f2df02ca49d1ce8e10d3f4390154f8607a087")]
 [assembly: System.Reflection.AssemblyProductAttribute("GameWikiApp")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GameWikiApp")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

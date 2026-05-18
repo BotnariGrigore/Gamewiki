@@ -66,3 +66,20 @@
 15.05.2026 08:34:43 AUTH: User=Slava, PasswordValid=True
 15.05.2026 08:35:36 AUTH: User=Anton, PasswordValid=True
 15.05.2026 08:56:22 AUTH: User=Slava, PasswordValid=True
+17.05.2026 21:35:17 AUTH: User=Anton, PasswordValid=True
+17.05.2026 21:57:09 AUTH: User=sandu, PasswordValid=True
+17.05.2026 21:58:04 AUTH: User=Anton, PasswordValid=True
+18.05.2026 05:49:23 AUTH: User=Anton, PasswordValid=True
+18.05.2026 05:50:34 AUTH: User not found - identifier=Grisa
+18.05.2026 05:50:44 AUTH: User=Denis, PasswordValid=False
+18.05.2026 05:50:45 AUTH: User=Denis, PasswordValid=False
+18.05.2026 05:50:45 AUTH: User=Denis, PasswordValid=False
+18.05.2026 05:50:45 AUTH: User=Denis, PasswordValid=False
+18.05.2026 05:50:45 AUTH: User=Denis, PasswordValid=False
+18.05.2026 05:50:46 AUTH: User=Denis, PasswordValid=False
+18.05.2026 05:50:46 AUTH: User=Denis, PasswordValid=False
+18.05.2026 05:51:03 AUTH: User=Slava, PasswordValid=True
+18.05.2026 05:52:13 AUTH: User=Anton, PasswordValid=True
+18.05.2026 05:52:40 AUTH: User=Anton, PasswordValid=True
+18.05.2026 05:53:41 AUTH: User=Slava, PasswordValid=True
+18.05.2026 06:10:37 AUTH: User=Anton, PasswordValid=True

@@ -18,6 +18,7 @@ namespace GameWikiApp.Services
         public Task<IEnumerable<WikiArticle>> GetPopularAsync(int limit = 10) => _repo.GetPopularAsync(limit);
         public Task<IEnumerable<WikiArticle>> GetRecentAsync(int limit = 10) => _repo.GetRecentAsync(limit);
         public Task<IEnumerable<WikiArticle>> GetRelatedAsync(int articleId, int gameId, int limit = 6) => _repo.GetRelatedAsync(articleId, gameId, limit);
+        public Task<IEnumerable<WikiArticle>> GetByAuthorIdAsync(int authorId, bool onlyPublished = true) => _repo.GetByAuthorIdAsync(authorId, onlyPublished);
         public Task<IEnumerable<ArticleLink>> GetLinkedArticlesAsync(int articleId) => _repo.GetLinkedArticlesAsync(articleId);
         public Task<int> CreateAsync(WikiArticle article) => _repo.CreateAsync(article);
         public Task<bool> TrackViewOnceAsync(int articleId, int userId) => _repo.TrackViewOnceAsync(articleId, userId);

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
@@ -20,8 +21,11 @@ public sealed class UserProfileView : UserControl
     private readonly int _userId;
     private readonly Func<int, Task> _openChat;
     private readonly Func<Task> _openSettings;
+    private readonly Func<int, Task> _openArticle;
     private readonly UserRepository _users = new();
     private readonly FriendService _friends = new();
+    private readonly ArticleService _articles = new();
+    private readonly SavedArticleService _savedArticles = new();
 
     private readonly Border _avatarHost = new();
     private readonly TextBlock _nameText = new();
@@ -32,6 +36,13 @@ public sealed class UserProfileView : UserControl
     private readonly TextBlock _connectionsValue = new();
     private readonly TextBlock _joinedValue = new();
     private readonly TextBlock _actionHint = new();
+    private readonly Border _articlesCard = new();
+    private readonly TextBlock _articlesTitle = new();
+    private readonly TextBlock _articlesSubtitle = new();
+    private readonly Button _savedTabButton = new();
+    private readonly Button _myTabButton = new();
+    private readonly WrapPanel _savedArticlesWrap = new();
+    private readonly WrapPanel _myArticlesWrap = new();
     private readonly Button _primaryButton = new();
     private readonly Button _secondaryButton = new();
 
@@ -41,12 +52,20 @@ public sealed class UserProfileView : UserControl
     private Friend? _incomingRequest;
     private Friend? _outgoingRequest;
     private bool _loadedOnce;
+    private ProfileArticlesTab _articlesTab = ProfileArticlesTab.MyArticles;
 
-    public UserProfileView(int userId, Func<int, Task> openChat, Func<Task> openSettings)
+    private enum ProfileArticlesTab
+    {
+        Saved,
+        MyArticles
+    }
+
+    public UserProfileView(int userId, Func<int, Task> openChat, Func<Task> openSettings, Func<int, Task> openArticle)
     {
         _userId = userId;
         _openChat = openChat;
         _openSettings = openSettings;
+        _openArticle = openArticle;
 
         Content = BuildLayout();
         Loaded += async (_, __) =>
@@ -116,6 +135,7 @@ public sealed class UserProfileView : UserControl
 
         await RefreshAvatarAsync();
         UpdateActions();
+        await RefreshArticlesAsync();
     }
 
     private Control BuildLayout()
@@ -136,6 +156,7 @@ public sealed class UserProfileView : UserControl
         stack.Children.Add(BuildHero());
         stack.Children.Add(BuildStatsPanel());
         stack.Children.Add(BuildDetailsCard());
+        stack.Children.Add(BuildArticlesCard());
 
         scroll.Content = stack;
         return scroll;
@@ -311,6 +332,372 @@ public sealed class UserProfileView : UserControl
 
         shell.Child = stack;
         return shell;
+    }
+
+    private Control BuildArticlesCard()
+    {
+        _articlesCard.Background = ThemePalette.BgSecondaryBrush;
+        _articlesCard.BorderBrush = ThemePalette.BorderLightBrush;
+        _articlesCard.BorderThickness = new Thickness(1);
+        _articlesCard.CornerRadius = new CornerRadius(22);
+        _articlesCard.Padding = new Thickness(22);
+
+        _articlesTitle.FontSize = 20;
+        _articlesTitle.FontWeight = FontWeight.Bold;
+        _articlesTitle.Foreground = ThemePalette.TextPrimaryBrush;
+        _articlesTitle.Text = "Articles";
+
+        _articlesSubtitle.FontSize = 12;
+        _articlesSubtitle.Foreground = ThemePalette.TextSecondaryBrush;
+        _articlesSubtitle.TextWrapping = TextWrapping.Wrap;
+        _articlesSubtitle.Text = "Loading saved articles and your latest work...";
+
+        _savedTabButton.Content = UiFactory.CreateButtonContent("Saved Articles", char.ConvertFromUtf32(0x1F516), 8);
+        _savedTabButton.Background = ThemePalette.BgTertiaryBrush;
+        _savedTabButton.BorderBrush = ThemePalette.BorderLightBrush;
+        _savedTabButton.BorderThickness = new Thickness(1);
+        _savedTabButton.Foreground = ThemePalette.TextPrimaryBrush;
+        _savedTabButton.CornerRadius = new CornerRadius(999);
+        _savedTabButton.Padding = new Thickness(14, 9);
+        _savedTabButton.MinHeight = 38;
+        _savedTabButton.IsVisible = false;
+        _savedTabButton.Click += (_, __) =>
+        {
+            _articlesTab = ProfileArticlesTab.Saved;
+            ApplyArticlesTab();
+        };
+
+        _myTabButton.Content = UiFactory.CreateButtonContent("My Articles", char.ConvertFromUtf32(0x270F), 8);
+        _myTabButton.Background = ThemePalette.AccentBrush;
+        _myTabButton.BorderBrush = ThemePalette.BorderLightBrush;
+        _myTabButton.BorderThickness = new Thickness(1);
+        _myTabButton.Foreground = ThemePalette.AccentForegroundBrush;
+        _myTabButton.CornerRadius = new CornerRadius(999);
+        _myTabButton.Padding = new Thickness(14, 9);
+        _myTabButton.MinHeight = 38;
+        _myTabButton.IsVisible = false;
+        _myTabButton.Click += (_, __) =>
+        {
+            _articlesTab = ProfileArticlesTab.MyArticles;
+            ApplyArticlesTab();
+        };
+
+        _savedArticlesWrap.Orientation = Orientation.Horizontal;
+        _savedArticlesWrap.ItemWidth = 280;
+        _savedArticlesWrap.ItemHeight = 320;
+        _savedArticlesWrap.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _savedArticlesWrap.Margin = new Thickness(0, 0, 0, 8);
+
+        _myArticlesWrap.Orientation = Orientation.Horizontal;
+        _myArticlesWrap.ItemWidth = 280;
+        _myArticlesWrap.ItemHeight = 320;
+        _myArticlesWrap.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _myArticlesWrap.Margin = new Thickness(0, 0, 0, 8);
+
+        var stack = new StackPanel
+        {
+            Spacing = 16
+        };
+
+        var header = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            ColumnSpacing = 12
+        };
+
+        var titleStack = new StackPanel
+        {
+            Spacing = 4
+        };
+        titleStack.Children.Add(_articlesTitle);
+        titleStack.Children.Add(_articlesSubtitle);
+        header.Children.Add(titleStack);
+
+        var tabRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Spacing = 8
+        };
+        tabRow.Children.Add(_savedTabButton);
+        tabRow.Children.Add(_myTabButton);
+        header.Children.Add(tabRow);
+        Grid.SetColumn(tabRow, 1);
+
+        stack.Children.Add(header);
+        stack.Children.Add(_savedArticlesWrap);
+        stack.Children.Add(_myArticlesWrap);
+
+        _articlesCard.Child = stack;
+        return _articlesCard;
+    }
+
+    private async Task RefreshArticlesAsync()
+    {
+        try
+        {
+            if (_profile == null)
+            {
+                _articlesCard.Child = BuildArticlesPlaceholder("Articles unavailable", "The selected profile could not be loaded.");
+                return;
+            }
+
+            if (_isSelf)
+            {
+                var savedTask = _savedArticles.GetByUserIdAsync(_profile.UserId);
+                var authoredTask = _articles.GetByAuthorIdAsync(_profile.UserId, false);
+                await Task.WhenAll(savedTask, authoredTask);
+
+                var savedArticles = savedTask.Result.ToList();
+                var myArticles = authoredTask.Result.ToList();
+
+                _articlesTitle.Text = "Saved Articles & My Articles";
+                _articlesSubtitle.Text = "Switch between the articles you've saved and the ones you've written.";
+                _savedTabButton.IsVisible = true;
+                _myTabButton.IsVisible = true;
+                _savedTabButton.Content = UiFactory.CreateButtonContent($"Saved Articles ({savedArticles.Count})", char.ConvertFromUtf32(0x1F516), 8);
+                _myTabButton.Content = UiFactory.CreateButtonContent($"My Articles ({myArticles.Count})", char.ConvertFromUtf32(0x270F), 8);
+
+                await PopulateArticleWrapAsync(
+                    _savedArticlesWrap,
+                    savedArticles,
+                    false,
+                    "You have not saved any articles yet.");
+
+                await PopulateArticleWrapAsync(
+                    _myArticlesWrap,
+                    myArticles,
+                    true,
+                    "You have not written any articles yet.");
+
+                if (_articlesTab == ProfileArticlesTab.MyArticles && myArticles.Count == 0 && savedArticles.Count > 0)
+                {
+                    _articlesTab = ProfileArticlesTab.Saved;
+                }
+
+                if (_articlesTab == ProfileArticlesTab.Saved && savedArticles.Count == 0 && myArticles.Count > 0)
+                {
+                    _articlesTab = ProfileArticlesTab.MyArticles;
+                }
+
+                ApplyArticlesTab();
+                return;
+            }
+
+            var publishedArticles = (await _articles.GetByAuthorIdAsync(_profile.UserId, true)).ToList();
+            _articlesTitle.Text = $"{_profile.Username}'s Articles";
+            _articlesSubtitle.Text = "Public articles created by this user.";
+            _savedTabButton.IsVisible = false;
+            _myTabButton.IsVisible = false;
+            _savedArticlesWrap.Children.Clear();
+            _savedArticlesWrap.IsVisible = false;
+
+            await PopulateArticleWrapAsync(
+                _myArticlesWrap,
+                publishedArticles,
+                false,
+                "This profile has not published any articles yet.");
+
+            _myArticlesWrap.IsVisible = true;
+            ApplyArticlesTab();
+        }
+        catch
+        {
+            _savedTabButton.IsVisible = false;
+            _myTabButton.IsVisible = false;
+            _savedArticlesWrap.Children.Clear();
+            _myArticlesWrap.Children.Clear();
+            _articlesCard.Child = BuildArticlesPlaceholder(
+                "Articles unavailable",
+                "The article lists could not be loaded right now.");
+        }
+    }
+
+    private void ApplyArticlesTab()
+    {
+        if (!_isSelf)
+        {
+            _savedArticlesWrap.IsVisible = false;
+            _myArticlesWrap.IsVisible = true;
+            _savedTabButton.Background = ThemePalette.BgTertiaryBrush;
+            _myTabButton.Background = ThemePalette.AccentBrush;
+            _savedTabButton.Foreground = ThemePalette.TextPrimaryBrush;
+            _myTabButton.Foreground = ThemePalette.AccentForegroundBrush;
+            return;
+        }
+
+        var showSaved = _articlesTab == ProfileArticlesTab.Saved;
+        _savedArticlesWrap.IsVisible = showSaved;
+        _myArticlesWrap.IsVisible = !showSaved;
+
+        _savedTabButton.Background = showSaved ? ThemePalette.AccentBrush : ThemePalette.BgTertiaryBrush;
+        _savedTabButton.Foreground = showSaved ? ThemePalette.AccentForegroundBrush : ThemePalette.TextPrimaryBrush;
+        _myTabButton.Background = showSaved ? ThemePalette.BgTertiaryBrush : ThemePalette.AccentBrush;
+        _myTabButton.Foreground = showSaved ? ThemePalette.TextPrimaryBrush : ThemePalette.AccentForegroundBrush;
+    }
+
+    private async Task PopulateArticleWrapAsync(
+        WrapPanel wrapPanel,
+        IReadOnlyCollection<WikiArticle> articles,
+        bool editable,
+        string emptyMessage)
+    {
+        wrapPanel.Children.Clear();
+
+        var articleList = articles.ToList();
+        if (articleList.Count == 0)
+        {
+            wrapPanel.Children.Add(BuildArticlesPlaceholder("Nothing here yet", emptyMessage));
+            return;
+        }
+
+        var bitmaps = await Task.WhenAll(articleList.Select(article => ImageLoader.LoadAsync(article.CoverImage)));
+        for (var i = 0; i < articleList.Count; i++)
+        {
+            wrapPanel.Children.Add(BuildArticleCard(articleList[i], bitmaps[i], editable));
+        }
+    }
+
+    private Control BuildArticleCard(WikiArticle article, Avalonia.Media.Imaging.Bitmap? bitmap, bool editable)
+    {
+        var card = new Border
+        {
+            Width = 280,
+            Height = 320,
+            Background = ThemePalette.BgCardBrush,
+            BorderBrush = ThemePalette.BorderLightBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(18),
+            Padding = new Thickness(14),
+            Margin = new Thickness(0, 0, 14, 14),
+            Cursor = new Cursor(StandardCursorType.Hand),
+            ClipToBounds = true
+        };
+
+        var stack = new StackPanel
+        {
+            Spacing = 8
+        };
+
+        stack.Children.Add(UiFactory.CreateMediaFrame(bitmap, article.GameTitle ?? article.Title, 252, 132, true, 14));
+
+        stack.Children.Add(new TextBlock
+        {
+            Text = article.Title,
+            FontSize = 13,
+            FontWeight = FontWeight.Bold,
+            Foreground = ThemePalette.TextPrimaryBrush,
+            TextWrapping = TextWrapping.Wrap,
+            MaxLines = 2
+        });
+
+        var categoryRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 6
+        };
+
+        categoryRow.Children.Add(new Border
+        {
+            Background = ThemePalette.AccentDimBrush,
+            CornerRadius = new CornerRadius(999),
+            Padding = new Thickness(10, 4),
+            Child = new TextBlock
+            {
+                Text = article.CategoryLabel,
+                FontSize = 10,
+                FontWeight = FontWeight.Bold,
+                Foreground = ThemePalette.AccentForegroundBrush
+            }
+        });
+
+        stack.Children.Add(categoryRow);
+
+        stack.Children.Add(new TextBlock
+        {
+            Text = article.GameTitle ?? "Unknown game",
+            FontSize = 10.5,
+            Foreground = ThemePalette.AccentBrush,
+            TextWrapping = TextWrapping.Wrap
+        });
+
+        stack.Children.Add(new TextBlock
+        {
+            Text = $"{article.ViewsCount} views",
+            FontSize = 10,
+            Foreground = ThemePalette.TextMutedBrush
+        });
+
+        if (editable)
+        {
+            var editButton = UiFactory.CreateSubtleButton("Quick edit", 118, char.ConvertFromUtf32(0x270F));
+            editButton.Height = 38;
+            editButton.Click += async (_, __) => await OpenArticleEditorAsync(article.ArticleId);
+            stack.Children.Add(editButton);
+        }
+
+        card.Child = stack;
+        card.PointerEntered += (_, __) => card.Background = ThemePalette.BgTertiaryBrush;
+        card.PointerExited += (_, __) => card.Background = ThemePalette.BgCardBrush;
+        card.PointerPressed += async (_, __) => await OpenArticleAsync(article.ArticleId);
+        return card;
+    }
+
+    private static Control BuildArticlesPlaceholder(string title, string message)
+    {
+        return new Border
+        {
+            Background = ThemePalette.BgSecondaryBrush,
+            BorderBrush = ThemePalette.BorderLightBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(16),
+            Padding = new Thickness(16),
+            Margin = new Thickness(0, 0, 14, 14),
+            Child = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = title,
+                        FontSize = 13,
+                        FontWeight = FontWeight.Bold,
+                        Foreground = ThemePalette.TextPrimaryBrush
+                    },
+                    new TextBlock
+                    {
+                        Text = message,
+                        FontSize = 11,
+                        Foreground = ThemePalette.TextMutedBrush,
+                        TextWrapping = TextWrapping.Wrap
+                    }
+                }
+            }
+        };
+    }
+
+    private async Task OpenArticleAsync(int articleId)
+    {
+        await _openArticle(articleId);
+    }
+
+    private async Task OpenArticleEditorAsync(int articleId)
+    {
+        if (AppState.CurrentUser == null)
+        {
+            return;
+        }
+
+        var owner = TopLevel.GetTopLevel(this) as Window;
+        if (owner == null)
+        {
+            return;
+        }
+
+        var editor = new ArticleEditorWindow(articleId);
+        await editor.ShowDialog<bool>(owner);
+        await LoadAsync();
     }
 
     private static Control BuildBadge(string text, IBrush background, IBrush foreground)
@@ -548,6 +935,19 @@ public sealed class UserProfileView : UserControl
         };
     }
 
+    private void ShowGuestState()
+    {
+        _statusText.Foreground = ThemePalette.WarningBrush;
+        _statusText.Text = "You need to sign in to edit your profile.";
+        _savedTabButton.IsVisible = false;
+        _myTabButton.IsVisible = false;
+        _savedArticlesWrap.Children.Clear();
+        _myArticlesWrap.Children.Clear();
+        _articlesCard.Child = BuildArticlesPlaceholder(
+            "Articles unavailable",
+            "Sign in to view saved and authored articles.");
+    }
+
     private void ShowMessage(string title, string message)
     {
         _nameText.Text = title;
@@ -560,6 +960,11 @@ public sealed class UserProfileView : UserControl
         _primaryButton.IsVisible = false;
         _secondaryButton.IsVisible = false;
         _actionHint.Text = string.Empty;
+        _savedTabButton.IsVisible = false;
+        _myTabButton.IsVisible = false;
+        _savedArticlesWrap.Children.Clear();
+        _myArticlesWrap.Children.Clear();
+        _articlesCard.Child = BuildArticlesPlaceholder(title, message);
     }
 
     private static string GetInitials(string? value)

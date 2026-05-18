@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.IO;
 using System.Threading.Tasks;
 using GameWikiApp.Data;
@@ -109,23 +110,17 @@ namespace GameWikiApp.Services
                 cmd.CommandText = "SELECT 1";
                 _ = cmd.ExecuteScalar();
 
-                // Minimal migration: ensure theme_preference column exists
-                try
-                {
-                    using var checkCmd = conn.CreateCommand();
-                    checkCmd.CommandText = "SHOW COLUMNS FROM users LIKE 'theme_preference'";
-                    var col = checkCmd.ExecuteScalar();
-                    if (col == null)
-                    {
-                        using var alterCmd = conn.CreateCommand();
-                        alterCmd.CommandText = "ALTER TABLE users ADD COLUMN IF NOT EXISTS theme_preference VARCHAR(20) DEFAULT 'light'";
-                        alterCmd.ExecuteNonQuery();
-                    }
-                }
-                catch (Exception ex2)
-                {
-                    try { File.AppendAllText("auth_errors.log", DateTime.UtcNow + " MIGRATION ERROR: " + ex2 + Environment.NewLine); } catch { }
-                }
+                EnsureColumn(conn, "users", "theme_preference", "ALTER TABLE users ADD COLUMN theme_preference VARCHAR(20) DEFAULT 'light'");
+                EnsureColumn(conn, "notifications", "source_user_id", "ALTER TABLE notifications ADD COLUMN source_user_id INT NULL AFTER user_id");
+                EnsureColumn(conn, "notifications", "notification_type", "ALTER TABLE notifications ADD COLUMN notification_type VARCHAR(50) NULL DEFAULT 'general' AFTER source_user_id");
+                EnsureColumn(conn, "notifications", "title", "ALTER TABLE notifications ADD COLUMN title VARCHAR(150) NULL AFTER notification_type");
+                EnsureColumn(conn, "notifications", "message", "ALTER TABLE notifications ADD COLUMN message TEXT NULL AFTER title");
+                EnsureColumn(conn, "notifications", "target_type", "ALTER TABLE notifications ADD COLUMN target_type VARCHAR(50) NULL AFTER message");
+                EnsureColumn(conn, "notifications", "target_id", "ALTER TABLE notifications ADD COLUMN target_id INT NULL AFTER target_type");
+                EnsureColumn(conn, "notifications", "action_route", "ALTER TABLE notifications ADD COLUMN action_route VARCHAR(255) NULL AFTER target_id");
+                EnsureColumn(conn, "notifications", "is_read", "ALTER TABLE notifications ADD COLUMN is_read BOOLEAN NOT NULL DEFAULT FALSE AFTER action_route");
+                EnsureColumn(conn, "notifications", "created_at", "ALTER TABLE notifications ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP AFTER is_read");
+                EnsureColumn(conn, "page_views", "viewed_at", "ALTER TABLE page_views ADD COLUMN viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP AFTER user_id");
 
                 return Task.FromResult<string?>(null);
             }
@@ -133,6 +128,28 @@ namespace GameWikiApp.Services
             {
                 try { File.AppendAllText("auth_errors.log", DateTime.UtcNow + " DB CHECK ERROR: " + ex + Environment.NewLine); } catch {}
                 return Task.FromResult<string?>(ex.Message);
+            }
+        }
+
+        private static void EnsureColumn(IDbConnection conn, string tableName, string columnName, string alterSql)
+        {
+            try
+            {
+                using var checkCmd = conn.CreateCommand();
+                checkCmd.CommandText = $"SHOW COLUMNS FROM `{tableName}` LIKE '{columnName}'";
+                var exists = checkCmd.ExecuteScalar() != null;
+                if (exists)
+                {
+                    return;
+                }
+
+                using var alterCmd = conn.CreateCommand();
+                alterCmd.CommandText = alterSql;
+                alterCmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                try { File.AppendAllText("auth_errors.log", DateTime.UtcNow + $" MIGRATION ERROR ({tableName}.{columnName}): " + ex + Environment.NewLine); } catch { }
             }
         }
     }

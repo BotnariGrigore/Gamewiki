@@ -109,27 +109,14 @@ LIMIT 1";
         public async Task<IEnumerable<WikiArticle>> GetArticlesAsync(int categoryId)
         {
             using var conn = DbConnection.GetOpen();
-            var sql = @"
-SELECT a.article_id AS ArticleId,
-       a.game_id AS GameId,
-       a.author_id AS AuthorId,
-       a.title AS Title,
-       a.slug AS Slug,
-       a.summary AS Summary,
-       a.content AS Content,
-       a.cover_image AS CoverImage,
-       a.views_count AS ViewsCount,
-       a.is_published AS IsPublished,
-       a.created_at AS CreatedAt,
-       a.updated_at AS UpdatedAt,
-       g.title AS GameTitle,
-       u.username AS AuthorUsername
-FROM wiki_articles a
-INNER JOIN article_categories ac ON ac.article_id = a.article_id
-INNER JOIN games g ON g.game_id = a.game_id
-INNER JOIN users u ON u.user_id = a.author_id
-WHERE ac.category_id = @CategoryId
-ORDER BY a.updated_at DESC";
+            var sql = ArticleRepository.SummarySelect + @"
+WHERE EXISTS (
+    SELECT 1
+    FROM article_categories ac
+    WHERE ac.article_id = a.article_id
+      AND ac.category_id = @CategoryId
+)
+ORDER BY a.updated_at DESC, a.views_count DESC";
             return await conn.QueryAsync<WikiArticle>(sql, new { CategoryId = categoryId });
         }
 

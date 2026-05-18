@@ -275,7 +275,7 @@ public sealed class ShellView : UserControl
             HorizontalAlignment = HorizontalAlignment.Right
         };
 
-        _notificationButton = CreateIconButton("⚑");
+        _notificationButton = CreateIconButton(char.ConvertFromUtf32(0x1F514));
         _notificationButton.Click += async (_, __) => await ToggleNotificationsAsync();
         actionRow.Children.Add(BuildNotificationButton());
 
@@ -336,15 +336,7 @@ public sealed class ShellView : UserControl
             Height = 42
         };
 
-        grid.Children.Add(new TextBlock
-        {
-            Text = "⚑",
-            FontSize = 16,
-            FontWeight = FontWeight.Bold,
-            Foreground = ThemePalette.TextPrimaryBrush,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
-        });
+        grid.Children.Add(UiFactory.CreateIcon(char.ConvertFromUtf32(0x1F514), 16, ThemePalette.TextPrimaryBrush));
 
         _notificationBadgeHost.Width = 18;
         _notificationBadgeHost.Height = 18;
@@ -391,7 +383,7 @@ public sealed class ShellView : UserControl
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(18),
                 Padding = new Thickness(16),
-                Width = 380,
+                Width = 420,
                 MaxHeight = 520,
                 Child = new StackPanel
                 {
@@ -542,8 +534,113 @@ public sealed class ShellView : UserControl
 
         foreach (var notification in notifications)
         {
-            _notificationList.Children.Add(BuildNotificationItem(notification));
+            _notificationList.Children.Add(BuildModernNotificationItem(notification));
         }
+    }
+
+    private Control BuildModernNotificationItem(Notification notification)
+    {
+        var card = new Border
+        {
+            Background = notification.IsRead ? ThemePalette.BgSecondaryBrush : ThemePalette.BgTertiaryBrush,
+            BorderBrush = notification.IsRead ? ThemePalette.BorderLightBrush : ThemePalette.AccentBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(16),
+            Padding = new Thickness(14),
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+
+        var grid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*"),
+            ColumnSpacing = 12
+        };
+
+        grid.Children.Add(BuildNotificationGlyphBadge(notification));
+        Grid.SetColumn(grid.Children[0], 0);
+
+        grid.Children.Add(BuildNotificationAvatar(notification));
+        Grid.SetColumn(grid.Children[1], 1);
+
+        var stack = new StackPanel
+        {
+            Spacing = 4
+        };
+
+        var header = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            ColumnSpacing = 8
+        };
+
+        header.Children.Add(new TextBlock
+        {
+            Text = notification.SourceUsername ?? "Unknown user",
+            FontSize = 11,
+            FontWeight = FontWeight.Bold,
+            Foreground = ThemePalette.TextPrimaryBrush,
+            TextWrapping = TextWrapping.Wrap
+        });
+
+        var time = new TextBlock
+        {
+            Text = notification.TimeLabel,
+            FontSize = 10,
+            Foreground = ThemePalette.TextMutedBrush,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        header.Children.Add(time);
+        Grid.SetColumn(time, 1);
+        stack.Children.Add(header);
+
+        stack.Children.Add(new TextBlock
+        {
+            Text = notification.Title,
+            FontSize = 12.5,
+            FontWeight = FontWeight.Bold,
+            Foreground = ThemePalette.TextPrimaryBrush,
+            TextWrapping = TextWrapping.Wrap
+        });
+
+        if (!notification.IsRead)
+        {
+            stack.Children.Add(new Border
+            {
+                Width = 8,
+                Height = 8,
+                Background = ThemePalette.AccentBrush,
+                CornerRadius = new CornerRadius(4)
+            });
+        }
+
+        stack.Children.Add(new TextBlock
+        {
+            Text = notification.Message,
+            FontSize = 11,
+            Foreground = ThemePalette.TextSecondaryBrush,
+            TextWrapping = TextWrapping.Wrap
+        });
+
+        grid.Children.Add(stack);
+        Grid.SetColumn(stack, 2);
+
+        card.Child = grid;
+        card.PointerPressed += async (_, __) => await OpenNotificationAsync(notification);
+        return card;
+    }
+
+    private static Control BuildNotificationGlyphBadge(Notification notification)
+    {
+        return new Border
+        {
+            Width = 28,
+            Height = 28,
+            Background = ThemePalette.BgTertiaryBrush,
+            BorderBrush = ThemePalette.BorderLightBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Child = UiFactory.CreateIcon(GetNotificationGlyph(notification.NotificationType), 12, ThemePalette.AccentBrush)
+        };
     }
 
     private Control BuildNotificationItem(Notification notification)
@@ -685,6 +782,24 @@ public sealed class ShellView : UserControl
         }
 
         return string.Concat(parts.Take(2).Select(x => char.ToUpperInvariant(x[0])));
+    }
+
+    private static string GetNotificationGlyph(string notificationType)
+    {
+        if (string.IsNullOrWhiteSpace(notificationType))
+        {
+            return "\u2139";
+        }
+
+        return notificationType.ToLowerInvariant() switch
+        {
+            "friend_request" => char.ConvertFromUtf32(0x1F91D),
+            "friend_accepted" => "\u2713",
+            "message" => char.ConvertFromUtf32(0x1F4E8),
+            "comment" => char.ConvertFromUtf32(0x1F4AC),
+            "like" => "\u2764",
+            _ => "\u2139"
+        };
     }
 
     private async Task ToggleNotificationsAsync()
@@ -958,7 +1073,8 @@ public sealed class ShellView : UserControl
             var view = new UserProfileView(
                 userId,
                 conversationUserId => NavigateFriendsChatAsync(conversationUserId),
-                NavigateSettingsAsync);
+                NavigateSettingsAsync,
+                articleId => NavigateArticleAsync(articleId));
 
             _pageHost.Content = view;
             await view.LoadAsync();

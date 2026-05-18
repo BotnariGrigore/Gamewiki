@@ -320,8 +320,7 @@ public sealed class WikiBrowserView : UserControl
         {
             articles = articles.Where(article =>
                 article.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                (article.Summary ?? string.Empty).Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                (article.Content ?? string.Empty).Contains(query, StringComparison.OrdinalIgnoreCase));
+                (article.Summary ?? string.Empty).Contains(query, StringComparison.OrdinalIgnoreCase));
         }
 
         return articles.GroupBy(a => a.ArticleId).Select(g => g.First()).ToList();

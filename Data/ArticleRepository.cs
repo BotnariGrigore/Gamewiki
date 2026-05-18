@@ -10,7 +10,9 @@ namespace GameWikiApp.Data
 {
     public class ArticleRepository
     {
-        private const string BaseSelect = @"
+        private static readonly TimeSpan ViewCooldown = TimeSpan.FromMinutes(30);
+
+        internal const string DetailSelect = @"
 SELECT a.article_id AS ArticleId,
        a.game_id AS GameId,
        a.author_id AS AuthorId,
@@ -26,7 +28,8 @@ SELECT a.article_id AS ArticleId,
        a.created_at AS CreatedAt,
        a.updated_at AS UpdatedAt,
        g.title AS GameTitle,
-       u.username AS AuthorUsername
+       u.username AS AuthorUsername,
+       COALESCE(cat.CategoryNames, '') AS CategoryNames
 FROM wiki_articles a
 INNER JOIN games g ON g.game_id = a.game_id
 INNER JOIN users u ON u.user_id = a.author_id
@@ -39,46 +42,91 @@ LEFT JOIN (
     SELECT article_id, COUNT(*) AS comment_count
     FROM article_comments
     GROUP BY article_id
-) cm ON cm.article_id = a.article_id";
+) cm ON cm.article_id = a.article_id
+LEFT JOIN (
+    SELECT ac.article_id,
+           GROUP_CONCAT(DISTINCT c.category_name ORDER BY c.category_name SEPARATOR ', ') AS CategoryNames
+    FROM article_categories ac
+    INNER JOIN categories c ON c.category_id = ac.category_id
+    GROUP BY ac.article_id
+) cat ON cat.article_id = a.article_id";
+
+        internal const string SummarySelect = @"
+SELECT a.article_id AS ArticleId,
+       a.game_id AS GameId,
+       a.author_id AS AuthorId,
+       a.title AS Title,
+       a.slug AS Slug,
+       a.summary AS Summary,
+       a.cover_image AS CoverImage,
+       a.views_count AS ViewsCount,
+       COALESCE(lk.like_count, 0) AS LikeCount,
+       COALESCE(cm.comment_count, 0) AS CommentCount,
+       a.is_published AS IsPublished,
+       a.created_at AS CreatedAt,
+       a.updated_at AS UpdatedAt,
+       g.title AS GameTitle,
+       u.username AS AuthorUsername,
+       COALESCE(cat.CategoryNames, '') AS CategoryNames
+FROM wiki_articles a
+INNER JOIN games g ON g.game_id = a.game_id
+INNER JOIN users u ON u.user_id = a.author_id
+LEFT JOIN (
+    SELECT article_id, COUNT(*) AS like_count
+    FROM article_likes
+    GROUP BY article_id
+) lk ON lk.article_id = a.article_id
+LEFT JOIN (
+    SELECT article_id, COUNT(*) AS comment_count
+    FROM article_comments
+    GROUP BY article_id
+) cm ON cm.article_id = a.article_id
+LEFT JOIN (
+    SELECT ac.article_id,
+           GROUP_CONCAT(DISTINCT c.category_name ORDER BY c.category_name SEPARATOR ', ') AS CategoryNames
+    FROM article_categories ac
+    INNER JOIN categories c ON c.category_id = ac.category_id
+    GROUP BY ac.article_id
+) cat ON cat.article_id = a.article_id";
 
         public async Task<WikiArticle?> GetByIdAsync(int id)
         {
             using var conn = DbConnection.GetOpen();
-            var sql = BaseSelect + " WHERE a.article_id = @Id LIMIT 1";
+            var sql = DetailSelect + " WHERE a.article_id = @Id LIMIT 1";
             return await conn.QueryFirstOrDefaultAsync<WikiArticle>(sql, new { Id = id });
         }
 
         public async Task<WikiArticle?> GetBySlugAsync(string slug)
         {
             using var conn = DbConnection.GetOpen();
-            var sql = BaseSelect + " WHERE a.slug = @Slug LIMIT 1";
+            var sql = DetailSelect + " WHERE a.slug = @Slug LIMIT 1";
             return await conn.QueryFirstOrDefaultAsync<WikiArticle>(sql, new { Slug = slug });
         }
 
         public async Task<IEnumerable<WikiArticle>> GetByGameIdAsync(int gameId, bool onlyPublished = true)
         {
             using var conn = DbConnection.GetOpen();
-            var sql = BaseSelect + @"
+            var sql = SummarySelect + @"
 WHERE a.game_id = @GameId
   AND (@OnlyPublished = 0 OR a.is_published = 1)
-ORDER BY a.updated_at DESC, a.views_count DESC";
+ORDER BY a.views_count DESC, a.updated_at DESC";
             return await conn.QueryAsync<WikiArticle>(sql, new { GameId = gameId, OnlyPublished = onlyPublished ? 1 : 0 });
         }
 
         public async Task<IEnumerable<WikiArticle>> SearchAsync(string query, bool onlyPublished = true)
         {
             using var conn = DbConnection.GetOpen();
-            var sql = BaseSelect + @"
+            var sql = SummarySelect + @"
 WHERE (a.title LIKE @Query OR a.summary LIKE @Query OR a.content LIKE @Query)
   AND (@OnlyPublished = 0 OR a.is_published = 1)
-ORDER BY a.updated_at DESC, a.views_count DESC";
+ORDER BY a.views_count DESC, a.updated_at DESC";
             return await conn.QueryAsync<WikiArticle>(sql, new { Query = "%" + query.Trim() + "%", OnlyPublished = onlyPublished ? 1 : 0 });
         }
 
         public async Task<IEnumerable<WikiArticle>> GetPopularAsync(int limit = 10)
         {
             using var conn = DbConnection.GetOpen();
-            var sql = BaseSelect + @"
+            var sql = SummarySelect + @"
 WHERE a.is_published = 1
 ORDER BY a.views_count DESC, a.updated_at DESC
 LIMIT @Limit";
@@ -88,7 +136,7 @@ LIMIT @Limit";
         public async Task<IEnumerable<WikiArticle>> GetRecentAsync(int limit = 10)
         {
             using var conn = DbConnection.GetOpen();
-            var sql = BaseSelect + @"
+            var sql = SummarySelect + @"
 WHERE a.is_published = 1
 ORDER BY a.updated_at DESC
 LIMIT @Limit";
@@ -98,13 +146,23 @@ LIMIT @Limit";
         public async Task<IEnumerable<WikiArticle>> GetRelatedAsync(int articleId, int gameId, int limit = 6)
         {
             using var conn = DbConnection.GetOpen();
-            var sql = BaseSelect + @"
+            var sql = SummarySelect + @"
 WHERE a.game_id = @GameId
   AND a.article_id <> @ArticleId
   AND a.is_published = 1
 ORDER BY a.views_count DESC, a.updated_at DESC
 LIMIT @Limit";
             return await conn.QueryAsync<WikiArticle>(sql, new { ArticleId = articleId, GameId = gameId, Limit = limit });
+        }
+
+        public async Task<IEnumerable<WikiArticle>> GetByAuthorIdAsync(int authorId, bool onlyPublished = true)
+        {
+            using var conn = DbConnection.GetOpen();
+            var sql = SummarySelect + @"
+WHERE a.author_id = @AuthorId
+  AND (@OnlyPublished = 0 OR a.is_published = 1)
+ORDER BY a.updated_at DESC, a.views_count DESC";
+            return await conn.QueryAsync<WikiArticle>(sql, new { AuthorId = authorId, OnlyPublished = onlyPublished ? 1 : 0 });
         }
 
         public async Task<IEnumerable<ArticleLink>> GetLinkedArticlesAsync(int articleId)
@@ -195,13 +253,39 @@ WHERE article_id = @ArticleId";
             using var tran = conn.BeginTransaction();
             try
             {
-                var inserted = await conn.ExecuteAsync(
-                    @"INSERT IGNORE INTO page_views (page_type, page_id, user_id)
-                      VALUES ('article', @ArticleId, @UserId)",
+                var lastViewedAt = await conn.ExecuteScalarAsync<DateTime?>(
+                    @"SELECT viewed_at
+                      FROM page_views
+                      WHERE page_type = 'article'
+                        AND page_id = @ArticleId
+                        AND user_id = @UserId
+                      LIMIT 1",
                     new { ArticleId = articleId, UserId = userId },
-                    tran) > 0;
+                    tran);
 
-                if (inserted)
+                var shouldIncrement = false;
+                if (!lastViewedAt.HasValue)
+                {
+                    shouldIncrement = await conn.ExecuteAsync(
+                        @"INSERT INTO page_views (page_type, page_id, user_id, viewed_at)
+                          VALUES ('article', @ArticleId, @UserId, NOW())",
+                        new { ArticleId = articleId, UserId = userId },
+                        tran) > 0;
+                }
+                else if (DateTime.Now - lastViewedAt.Value >= ViewCooldown)
+                {
+                    await conn.ExecuteAsync(
+                        @"UPDATE page_views
+                          SET viewed_at = NOW()
+                          WHERE page_type = 'article'
+                            AND page_id = @ArticleId
+                            AND user_id = @UserId",
+                        new { ArticleId = articleId, UserId = userId },
+                        tran);
+                    shouldIncrement = true;
+                }
+
+                if (shouldIncrement)
                 {
                     await conn.ExecuteAsync(
                         "UPDATE wiki_articles SET views_count = views_count + 1 WHERE article_id = @ArticleId",
@@ -210,7 +294,7 @@ WHERE article_id = @ArticleId";
                 }
 
                 tran.Commit();
-                return inserted;
+                return shouldIncrement;
             }
             catch
             {

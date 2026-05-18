@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
 using GameWikiApp.Models;
@@ -63,27 +64,11 @@ namespace GameWikiApp.Data
         public async Task<IEnumerable<WikiArticle>> GetByUserIdAsync(int userId)
         {
             using var conn = DbConnection.GetOpen();
-            var sql = @"
-SELECT a.article_id AS ArticleId,
-       a.game_id AS GameId,
-       a.author_id AS AuthorId,
-       a.title AS Title,
-       a.slug AS Slug,
-       a.summary AS Summary,
-       a.content AS Content,
-       a.cover_image AS CoverImage,
-       a.views_count AS ViewsCount,
-       a.is_published AS IsPublished,
-       a.created_at AS CreatedAt,
-       a.updated_at AS UpdatedAt,
-       g.title AS GameTitle,
-       u.username AS AuthorUsername
-FROM saved_articles s
-INNER JOIN wiki_articles a ON a.article_id = s.article_id
-INNER JOIN games g ON g.game_id = a.game_id
-INNER JOIN users u ON u.user_id = a.author_id
+            var sql = ArticleRepository.SummarySelect + @"
+INNER JOIN saved_articles s
+    ON s.article_id = a.article_id
 WHERE s.user_id = @UserId
-ORDER BY a.updated_at DESC";
+ORDER BY s.saved_id DESC, a.updated_at DESC, a.views_count DESC";
             return await conn.QueryAsync<WikiArticle>(sql, new { UserId = userId });
         }
     }

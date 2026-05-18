@@ -17,19 +17,19 @@ SELECT n.notification_id AS NotificationId,
        n.source_user_id AS SourceUserId,
        su.username AS SourceUsername,
        su.profile_image AS SourceProfileImage,
-       n.notification_type AS NotificationType,
-       n.title AS Title,
-       n.message AS Message,
-       n.target_type AS TargetType,
+       COALESCE(n.notification_type, 'general') AS NotificationType,
+       COALESCE(n.title, '') AS Title,
+       COALESCE(n.message, '') AS Message,
+       COALESCE(n.target_type, '') AS TargetType,
        n.target_id AS TargetId,
-       n.action_route AS ActionRoute,
-       n.is_read AS IsRead,
+       COALESCE(n.action_route, '') AS ActionRoute,
+       COALESCE(n.is_read, 0) AS IsRead,
        n.created_at AS CreatedAt
 FROM notifications n
 LEFT JOIN users su
     ON su.user_id = n.source_user_id
 WHERE n.user_id = @UserId
-ORDER BY n.is_read ASC, n.created_at DESC, n.notification_id DESC
+ORDER BY COALESCE(n.is_read, 0) ASC, n.created_at DESC, n.notification_id DESC
 LIMIT @Limit";
             return await conn.QueryAsync<Notification>(sql, new { UserId = userId, Limit = limit });
         }
@@ -38,7 +38,7 @@ LIMIT @Limit";
         {
             using var conn = DbConnection.GetOpen();
             return await conn.ExecuteScalarAsync<int>(
-                "SELECT COUNT(*) FROM notifications WHERE user_id = @UserId AND is_read = 0",
+                "SELECT COUNT(*) FROM notifications WHERE user_id = @UserId AND COALESCE(is_read, 0) = 0",
                 new { UserId = userId });
         }
 
@@ -51,13 +51,13 @@ SELECT n.notification_id AS NotificationId,
        n.source_user_id AS SourceUserId,
        su.username AS SourceUsername,
        su.profile_image AS SourceProfileImage,
-       n.notification_type AS NotificationType,
-       n.title AS Title,
-       n.message AS Message,
-       n.target_type AS TargetType,
+       COALESCE(n.notification_type, 'general') AS NotificationType,
+       COALESCE(n.title, '') AS Title,
+       COALESCE(n.message, '') AS Message,
+       COALESCE(n.target_type, '') AS TargetType,
        n.target_id AS TargetId,
-       n.action_route AS ActionRoute,
-       n.is_read AS IsRead,
+       COALESCE(n.action_route, '') AS ActionRoute,
+       COALESCE(n.is_read, 0) AS IsRead,
        n.created_at AS CreatedAt
 FROM notifications n
 LEFT JOIN users su
@@ -93,7 +93,7 @@ SELECT LAST_INSERT_ID();";
         {
             using var conn = DbConnection.GetOpen();
             return await conn.ExecuteAsync(
-                "UPDATE notifications SET is_read = 1 WHERE user_id = @UserId AND is_read = 0",
+                "UPDATE notifications SET is_read = 1 WHERE user_id = @UserId AND COALESCE(is_read, 0) = 0",
                 new { UserId = userId });
         }
     }
