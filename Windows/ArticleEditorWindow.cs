@@ -35,6 +35,7 @@ public sealed class ArticleEditorWindow : Window
     private readonly StackPanel _categoryPanel = new();
     private readonly CheckBox _publishedBox;
     private readonly Button _deleteButton;
+    private readonly Button _exportButton;
     private readonly List<Category> _categoryList = new();
     private WikiArticle? _article;
 
@@ -84,6 +85,8 @@ public sealed class ArticleEditorWindow : Window
         };
         _deleteButton = UiFactory.CreateSubtleButton("Delete", 120);
         _deleteButton.IsVisible = _articleId > 0;
+        _exportButton = UiFactory.CreateSubtleButton("Export PDF", 140, "⤓");
+        _exportButton.Click += async (_, __) => await ExportPdfAsync();
 
         Content = BuildLayout();
         Loaded += async (_, __) => await LoadAsync();
@@ -140,6 +143,9 @@ public sealed class ArticleEditorWindow : Window
         var close = UiFactory.CreateSubtleButton("Close", 120, "×");
         close.Click += (_, __) => Close(false);
         footer.Children.Add(close);
+
+        // Export button
+        footer.Children.Insert(2, _exportButton);
 
         stack.Children.Add(_publishedBox);
         stack.Children.Add(footer);
@@ -577,6 +583,73 @@ public sealed class ArticleEditorWindow : Window
         }
 
         await _articles.ReplaceLinksAsync(articleId, links);
+    }
+
+    private async Task ExportPdfAsync()
+    {
+        var article = _article ?? new WikiArticle
+        {
+            Title = _titleBox.Text?.Trim() ?? string.Empty,
+            Summary = string.IsNullOrWhiteSpace(_summaryBox.Text) ? null : _summaryBox.Text.Trim(),
+            Content = _contentBox.Text?.Trim() ?? string.Empty,
+            CoverImage = string.IsNullOrWhiteSpace(_coverBox.Text) ? null : _coverBox.Text.Trim()
+        };
+
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
+
+        var suggestedName = SlugGenerator.Generate(string.IsNullOrWhiteSpace(article.Title) ? "article" : article.Title) + ".pdf";
+
+        var options = new FilePickerSaveOptions
+        {
+            Title = "Save article as PDF",
+            SuggestedFileName = suggestedName,
+            FileTypeChoices = new List<FilePickerFileType>
+            {
+                new FilePickerFileType("PDF") { Patterns = new[] { "*.pdf" } }
+            }
+        };
+
+        var file = await topLevel.StorageProvider.SaveFilePickerAsync(options);
+        if (file == null)
+        {
+            return;
+        }
+
+        var path = file.Path?.LocalPath;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            await DialogHelper.ShowAsync(this, "Save failed", "Could not determine the selected file path.");
+            return;
+        }
+
+        try
+        {
+            var imagePaths = new List<string>();
+            if (_articleId > 0)
+            {
+                var imgs = (await _images.GetByArticleIdAsync(_articleId)).Select(x => x.ImageUrl).Where(x => !string.IsNullOrWhiteSpace(x));
+                imagePaths.AddRange(imgs);
+            }
+            else
+            {
+                imagePaths.AddRange(ParseGalleryUrls());
+            }
+
+            await PdfExporter.ExportArticleToPdfAsync(
+                article.Title,
+                article.Summary ?? string.Empty,
+                article.Content ?? string.Empty,
+                article.CoverImage,
+                imagePaths,
+                path);
+
+            await DialogHelper.ShowAsync(this, "Export complete", $"Article exported to {path}");
+        }
+        catch (Exception ex)
+        {
+            await DialogHelper.ShowAsync(this, "Export failed", ex.Message);
+        }
     }
 
     private IEnumerable<string> ParseGalleryUrls()

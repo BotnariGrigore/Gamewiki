@@ -10,7 +10,9 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Controls.Documents;
+using Avalonia.Platform.Storage;
 using GameWikiApp.Data;
+using GameWikiApp.Helpers;
 using GameWikiApp.Models;
 using GameWikiApp.Services;
 
@@ -35,6 +37,7 @@ public sealed class ArticleView : UserControl
     private readonly Button _likeButton = new();
     private readonly Button _saveButton = new();
     private readonly Button _editButton = new();
+    private readonly Button _exportButton = new();
     private readonly TextBlock _title = new();
     private readonly TextBlock _meta = new();
     private readonly TextBlock _counts = new();
@@ -123,6 +126,10 @@ public sealed class ArticleView : UserControl
         _editButton.Click += async (_, __) => await OpenEditorAsync();
         actionRow.Children.Add(_editButton);
 
+        _exportButton.Content = "Export PDF";
+        _exportButton.Click += async (_, __) => await ExportPdfAsync();
+        actionRow.Children.Add(_exportButton);
+
         header.Children.Add(actionRow);
 
         _gameChip.Text = "Game";
@@ -169,9 +176,11 @@ public sealed class ArticleView : UserControl
         return shell;
     }
 
-    private void BuildContentWithLinks(string content, IEnumerable<ArticleLink> links)
+    #pragma warning disable CS8602
+    private void BuildContentWithLinks(string? content, IEnumerable<ArticleLink> links)
     {
         _contentPanel.Children.Clear();
+        content ??= string.Empty;
 
         var linkMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var link in links)
@@ -199,7 +208,7 @@ public sealed class ArticleView : UserControl
         {
             if (match.Index > lastIndex)
             {
-                var textSegment = content[lastIndex..match.Index];
+                var textSegment = content![lastIndex..match.Index];
                 tb.Inlines.Add(new Run(textSegment));
             }
 
@@ -237,13 +246,14 @@ public sealed class ArticleView : UserControl
             }
         }
 
-        if (lastIndex < content.Length)
+        if (lastIndex < content!.Length)
         {
             tb.Inlines.Add(new Run(content[lastIndex..]));
         }
 
         _contentPanel.Children.Add(tb);
     }
+    #pragma warning restore CS8602
 
     private Control BuildGallerySection()
     {
@@ -386,18 +396,18 @@ public sealed class ArticleView : UserControl
             return;
         }
 
-        _title.Text = _article.Title;
-        _gameChip.Text = _article.GameTitle ?? "Unknown game";
-        _meta.Text = $"By {_article.AuthorUsername ?? "Unknown"} | Updated {_article.UpdatedAt:g}";
-        _counts.Text = $"{_article.ViewsCount} views | {_article.LikeCount} likes | {_article.CommentCount} comments";
+        _title.Text = _article?.Title ?? "Article not found";
+        _gameChip.Text = _article?.GameTitle ?? "Unknown game";
+        _meta.Text = _article == null ? string.Empty : $"By {_article.AuthorUsername ?? "Unknown"} | Updated {_article.UpdatedAt:g}";
+        _counts.Text = _article == null ? string.Empty : $"{_article.ViewsCount} views | {_article.LikeCount} likes | {_article.CommentCount} comments";
 
         var articleLinks = (await _articles.GetLinkedArticlesAsync(_articleId)).ToList();
-        BuildContentWithLinks(_article.Content, articleLinks);
+        BuildContentWithLinks(_article?.Content ?? string.Empty, articleLinks);
 
         // Cover image removed from header; use gallery or related sections instead.
 
-        _editButton.IsVisible = AppState.CurrentUser != null &&
-                                (AppState.IsAdmin || AppState.CurrentUser.UserId == _article.AuthorId);
+        _editButton.IsVisible = _article != null && AppState.CurrentUser != null &&
+                    (AppState.IsAdmin || AppState.CurrentUser.UserId == _article.AuthorId);
 
         if (AppState.CurrentUser != null)
         {
@@ -449,6 +459,7 @@ public sealed class ArticleView : UserControl
         var hasArticle = _article != null;
         _likeButton.IsEnabled = hasArticle && AppState.CurrentUser != null;
         _saveButton.IsEnabled = hasArticle && AppState.CurrentUser != null;
+        _exportButton.IsEnabled = hasArticle;
         _likeButton.Content = _isLiked ? "Liked" : "Like";
         _saveButton.Content = _isSaved ? "Saved" : "Save";
         _commentBox.IsEnabled = hasArticle && AppState.CurrentUser != null;
@@ -713,5 +724,59 @@ public sealed class ArticleView : UserControl
         var editor = new ArticleEditorWindow(_article.ArticleId, _article.GameId);
         await editor.ShowDialog<bool>(owner);
         await LoadAsync();
+    }
+
+    private async Task ExportPdfAsync()
+    {
+        if (_article == null)
+        {
+            return;
+        }
+
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
+
+        var suggestedName = SlugGenerator.Generate(string.IsNullOrWhiteSpace(_article.Title) ? "article" : _article.Title) + ".pdf";
+
+        var options = new FilePickerSaveOptions
+        {
+            Title = "Save article as PDF",
+            SuggestedFileName = suggestedName,
+            FileTypeChoices = new List<FilePickerFileType>
+            {
+                new FilePickerFileType("PDF") { Patterns = new[] { "*.pdf" } }
+            }
+        };
+
+        var file = await topLevel.StorageProvider.SaveFilePickerAsync(options);
+        if (file == null)
+        {
+            return;
+        }
+
+        var path = file.Path?.LocalPath;
+        var owner = TopLevel.GetTopLevel(this) as Window;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            if (owner != null) await DialogHelper.ShowAsync(owner, "Save failed", "Could not determine the selected file path.");
+            return;
+        }
+
+        try
+        {
+            var imagePaths = (await _images.GetByArticleIdAsync(_articleId)).Select(x => x.ImageUrl).Where(x => !string.IsNullOrWhiteSpace(x));
+            await PdfExporter.ExportArticleToPdfAsync(
+                _article.Title ?? string.Empty,
+                _article.Summary ?? string.Empty,
+                _article.Content ?? string.Empty,
+                _article.CoverImage,
+                imagePaths,
+                path);
+            if (owner != null) await DialogHelper.ShowAsync(owner, "Export complete", $"Article exported to {path}");
+        }
+        catch (Exception ex)
+        {
+            if (owner != null) await DialogHelper.ShowAsync(owner, "Export failed", ex.Message);
+        }
     }
 }

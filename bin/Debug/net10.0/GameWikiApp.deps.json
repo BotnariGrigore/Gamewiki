@@ -14,7 +14,9 @@
           "Avalonia.Themes.Fluent": "12.0.3",
           "AvaloniaUI.DiagnosticsSupport": "2.2.1",
           "Dapper": "2.1.1",
+          "Magick.NET-Q8-AnyCPU": "14.13.1",
           "MySqlConnector": "2.4.0",
+          "PdfSharpCore": "1.3.8",
           "System.Configuration.ConfigurationManager": "9.0.0"
         },
         "runtime": {
@@ -371,6 +373,67 @@
           }
         }
       },
+      "Magick.NET-Q8-AnyCPU/14.13.1": {
+        "dependencies": {
+          "Magick.NET.Core": "14.13.1"
+        },
+        "runtime": {
+          "lib/net8.0/Magick.NET-Q8-AnyCPU.dll": {
+            "assemblyVersion": "14.13.0.0",
+            "fileVersion": "14.13.1.0"
+          }
+        },
+        "runtimeTargets": {
+          "runtimes/linux-arm64/native/Magick.Native-Q8-arm64.dll.so": {
+            "rid": "linux-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-musl-x64/native/Magick.Native-Q8-x64.dll.so": {
+            "rid": "linux-musl-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-x64/native/Magick.Native-Q8-x64.dll.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/osx-arm64/native/Magick.Native-Q8-arm64.dll.dylib": {
+            "rid": "osx-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/osx-x64/native/Magick.Native-Q8-x64.dll.dylib": {
+            "rid": "osx-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-arm64/native/Magick.Native-Q8-arm64.dll": {
+            "rid": "win-arm64",
+            "assetType": "native",
+            "fileVersion": "10.2.0.0"
+          },
+          "runtimes/win-x64/native/Magick.Native-Q8-x64.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "10.2.0.0"
+          },
+          "runtimes/win-x86/native/Magick.Native-Q8-x86.dll": {
+            "rid": "win-x86",
+            "assetType": "native",
+            "fileVersion": "10.2.0.0"
+          }
+        }
+      },
+      "Magick.NET.Core/14.13.1": {
+        "runtime": {
+          "lib/net8.0/Magick.NET.Core.dll": {
+            "assemblyVersion": "14.13.0.0",
+            "fileVersion": "14.13.1.0"
+          }
+        }
+      },
       "MicroCom.Runtime/0.11.4": {
         "runtime": {
           "lib/net5.0/MicroCom.Runtime.dll": {
@@ -415,6 +478,39 @@
           "lib/net9.0/MySqlConnector.dll": {
             "assemblyVersion": "2.0.0.0",
             "fileVersion": "2.4.0.0"
+          }
+        }
+      },
+      "PdfSharpCore/1.3.8": {
+        "dependencies": {
+          "SixLabors.Fonts": "1.0.0-beta0013",
+          "SixLabors.ImageSharp": "1.0.0"
+        },
+        "runtime": {
+          "lib/net5.0/PdfSharpCore.dll": {
+            "assemblyVersion": "1.3.8.0",
+            "fileVersion": "1.3.8.0"
+          }
+        },
+        "resources": {
+          "lib/net5.0/de/PdfSharpCore.resources.dll": {
+            "locale": "de"
+          }
+        }
+      },
+      "SixLabors.Fonts/1.0.0-beta0013": {
+        "runtime": {
+          "lib/netstandard2.1/SixLabors.Fonts.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "SixLabors.ImageSharp/1.0.0": {
+        "runtime": {
+          "lib/netcoreapp3.1/SixLabors.ImageSharp.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
           }
         }
       },
@@ -733,6 +829,20 @@
       "path": "harfbuzzsharp.nativeassets.win32/8.3.1.3",
       "hashPath": "harfbuzzsharp.nativeassets.win32.8.3.1.3.nupkg.sha512"
     },
+    "Magick.NET-Q8-AnyCPU/14.13.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Naw4lYw9Mv+Tnd67H2Un+joZsZTWmbo7A4kycoosM6JnclMXb+ZNRbCqgvMRA6wAEJfybFDiP5NauLgL4xkyXA==",
+      "path": "magick.net-q8-anycpu/14.13.1",
+      "hashPath": "magick.net-q8-anycpu.14.13.1.nupkg.sha512"
+    },
+    "Magick.NET.Core/14.13.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-BhqOKCLixvj/Ofwe+aRPHqoGdWekvKavsQrivBSuUq0zzzijnIF/OxqVA+GCd6WP46C4PaIfGhR65BPi2M0cKg==",
+      "path": "magick.net.core/14.13.1",
+      "hashPath": "magick.net.core.14.13.1.nupkg.sha512"
+    },
     "MicroCom.Runtime/0.11.4": {
       "type": "package",
       "serviceable": true,
@@ -767,6 +877,27 @@
       "sha512": "sha512-78M+gVOjbdZEDIyXQqcA7EYlCGS3tpbUELHvn6638A2w0pkPI625ixnzsa5staAd3N9/xFmPJtkKDYwsXpFi/w==",
       "path": "mysqlconnector/2.4.0",
       "hashPath": "mysqlconnector.2.4.0.nupkg.sha512"
+    },
+    "PdfSharpCore/1.3.8": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-15d4nvEOvGBlwXoyFjVPgIIDkEitOVeBlE0ybhwVOsLmdgkiFHCUIIVGmBBFn8Nxyg8KrRQhqNoV7AS68HetEA==",
+      "path": "pdfsharpcore/1.3.8",
+      "hashPath": "pdfsharpcore.1.3.8.nupkg.sha512"
+    },
+    "SixLabors.Fonts/1.0.0-beta0013": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-NaD8R8GdHqnPP/3GUI6IbJNt3EHjU05CIJw/1gz11NoUBaePhtgDogG1XFguR2nSoXofGJ35W+TgW1ZTVp5W1Q==",
+      "path": "sixlabors.fonts/1.0.0-beta0013",
+      "hashPath": "sixlabors.fonts.1.0.0-beta0013.nupkg.sha512"
+    },
+    "SixLabors.ImageSharp/1.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-8amvsk8NXnCxZV0lvJppAZJknViWgBOO/2V59IGR6DVoD13mSmG+/Z9eg5IwrHQuRHp5RD9lfXBXDZyk8rTKDg==",
+      "path": "sixlabors.imagesharp/1.0.0",
+      "hashPath": "sixlabors.imagesharp.1.0.0.nupkg.sha512"
     },
     "SkiaSharp/3.119.4-preview.1.1": {
       "type": "package",

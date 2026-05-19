@@ -6,7 +6,7 @@ namespace GameWikiApp.Helpers
 {
     public static class PasswordHasher
     {
-        // PBKDF2 with SHA256
+     
         public static string Hash(string password)
         {
             var salt = RandomNumberGenerator.GetBytes(16);
@@ -18,10 +18,7 @@ namespace GameWikiApp.Helpers
         {
             try
             {
-                // Support multiple formats:
-                // 1) salt:hash (base64)
-                // 2) iterations:salt:hash
-                // 3) pbkdf2_sha256$iterations$salt$hash
+             
 
                 int iterations = 100_000;
                 string saltB64 = null!;
@@ -30,7 +27,7 @@ namespace GameWikiApp.Helpers
                 if (stored.Contains('$'))
                 {
                     var tok = stored.Split('$');
-                    // expected pbkdf2_sha256$100000$salt$hash
+                
                     if (tok.Length >= 4 && tok[1].All(char.IsDigit))
                     {
                         iterations = int.Parse(tok[1]);
